@@ -1,0 +1,72 @@
+services:
+  admin:
+    build:
+      context: ./apps/admin
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://bot-api:3001
+      NODE_ENV: production
+    depends_on:
+      - bot-api
+
+  bot-api:
+    build:
+      context: ./apps/bot-service
+      dockerfile: Dockerfile
+    environment:
+      BOT_SERVICE_ROLE: api
+      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      ZALO_UPDATE_MODE: webhook
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  bot-worker:
+    build:
+      context: ./apps/bot-service
+      dockerfile: Dockerfile
+    environment:
+      BOT_SERVICE_ROLE: worker
+      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      ZALO_UPDATE_MODE: webhook
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: lhu_zbot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lhu_zbot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:
