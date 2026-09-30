@@ -1,92 +1,41 @@
+---
+name: phase-code-review
+description: Adversarially review each phase pull request against repository architecture, security, tests, documentation, regression safety, Docker Compose runtime requirements, and phase acceptance criteria before merge.
+---
+
 # Phase Code Review Skill
 
 ## Purpose
-
-Use this skill after implementation of every phase in `MASTER_IMPLEMENTATION_PLAN.md` and before a phase PR may be approved for merge into `main`.
-
-The reviewer is adversarial: its job is to find defects, missing acceptance criteria, architectural drift, security problems, insufficient tests, unsafe migrations, regressions, undocumented behavior and unverifiable claims. A phase is not approved merely because it compiles.
+Use this skill after every implementation phase and before declaring its PR ready to merge. Review the actual diff, not the implementation summary.
 
 ## Required Inputs
-
-Before reviewing:
-
-1. Read `AGENTS.md` completely.
-2. Read `MASTER_IMPLEMENTATION_PLAN.md` completely.
-3. Identify the exact phase number from the PR title/body/branch.
-4. Read the acceptance criteria for that phase.
-5. Inspect the complete PR diff against `main`.
-6. Inspect relevant tests and documentation, not only production code.
-7. For Zalo behavior, verify against current official Zalo Bot documentation and the installed `node-zalo-bot` API/types.
-8. For external libraries/frameworks, use current authoritative documentation when behavior is uncertain.
-
-Never approve based only on the implementation agent's summary.
+Read `AGENTS.md`, `MASTER_IMPLEMENTATION_PLAN.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the exact phase acceptance criteria, and the complete PR diff. For Zalo behavior verify current official Zalo Bot documentation and installed `node-zalo-bot` API/types.
 
 ## Review Dimensions
 
-### 1. Scope and Acceptance Criteria
-- All requirements of the current phase are implemented.
-- No required acceptance criterion is skipped.
-- No material future-phase implementation is introduced without necessity.
-- Claims in PR description match actual code.
+### Scope and architecture
+Verify all current-phase requirements, no unjustified future-phase work, Admin-to-NestJS boundary, Zalo/provider adapter boundaries, and repository conventions.
 
-### 2. Architecture
-- Boundaries in `AGENTS.md` are preserved.
-- Admin does not directly access the production database.
-- Zalo SDK does not leak outside its adapter/module boundary.
-- Provider SDKs do not leak into domain/application logic.
-- Queue/database/infrastructure details are isolated appropriately.
-- No needless abstractions or duplicate domain models are introduced.
+### Docker Compose runtime
+Once introduced, the product MUST run as a Compose application. PostgreSQL+pgvector and Redis are containers, never host prerequisites. Verify healthchecks, named persistent volumes, internal networking, dependency readiness, graceful shutdown/restart behavior, environment/secrets configuration, and that database/Redis ports are not publicly exposed in production Compose. Images must not bake credentials.
 
-### 3. Correctness and Reliability
-- Happy path and failure paths are correct.
-- Idempotency/retry semantics are safe where applicable.
-- Race conditions and duplicate processing are considered.
-- Timeouts and graceful shutdown are handled where applicable.
-- Error handling preserves useful context without leaking secrets.
+### Correctness and reliability
+Review happy/failure paths, idempotency, retries, races, duplicate processing, timeouts, graceful shutdown and safe errors.
 
-### 4. Security and Privacy
-Check authentication, authorization, secret handling, injection, SSRF, XSS, CSRF where applicable, unsafe redirects, webhook validation, prompt injection, logging/redaction, dependency risk and unsafe defaults.
+### Security and privacy
+Review authentication, authorization, secrets, injection, SSRF, XSS, CSRF where relevant, redirects, webhook validation, prompt injection, logging/redaction, dependencies and container security. Credential exposure, authorization bypass, critical injection/SSRF or fabricated webhook security is BLOCKING.
 
-Any credential exposure, authorization bypass, critical injection/SSRF, fabricated webhook security or equivalent issue is BLOCKING.
+### Database/migrations
+Verify Prisma schema/migrations, clean migration against containerized PostgreSQL+pgvector, existing-data compatibility, destructive-change strategy and indexes/constraints.
 
-### 5. Database and Migrations
-When relevant:
-- Prisma schema and migrations agree.
-- Migration works from a clean database.
-- Existing-data compatibility is considered.
-- Destructive migration requires explicit justification and rollback/migration strategy.
-- Constraints/indexes match invariants and query patterns.
+### Tests, observability and docs
+Require meaningful deterministic tests, documented Zalo fixtures, no paid live AI in normal CI, adequate correlation/logging/metrics/health behavior, updated docs and `.env.example` without real secrets.
 
-### 6. Tests
-- Tests cover behavior, not implementation trivia.
-- Important failure paths are covered.
-- Tests are deterministic and do not require paid live AI calls in normal CI.
-- Zalo fixtures match current documented structures.
-- No assertions were weakened merely to obtain green CI.
-- No meaningful tests were deleted without replacement/justification.
-
-### 7. Observability
-Where relevant, correlation IDs, structured logs, metrics/traces and health behavior are adequate. Secrets and unnecessary personal content must not be logged.
-
-### 8. Documentation
-- Architecture/API/config changes are documented in the appropriate docs.
-- `.env.example` is updated for new configuration without real secrets.
-- README/runbook changes are made when operator/developer behavior changes.
-
-### 9. Maintainability
-- Strict TypeScript is preserved.
-- Avoid `any`, unsafe casts and unjustified non-null assertions.
-- Naming and module ownership are clear.
-- No dead code, debug code, commented-out secrets or temporary bypasses remain.
-
-### 10. Regression and Product Readiness
-- Existing phases still satisfy their acceptance criteria.
-- Root commands remain valid.
-- Build/runtime changes do not silently break earlier functionality.
+### Maintainability/regression
+Preserve strict TypeScript and existing phase behavior. Reject weakened checks, dead/debug code, unsafe casts/`any` without justification, and runtime regressions.
 
 ## Mandatory Verification
-
-Run the repository's actual verification commands. At minimum when available:
+Run the actual repository commands when applicable:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -94,81 +43,50 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+docker compose config
 ```
 
-Run phase-specific integration/E2E/evaluation/security checks required by the implementation plan. Never claim a command passed unless it was actually executed.
+Once Compose runtime exists, also run the phase-appropriate Compose smoke/integration verification defined by repository docs. Never claim a command passed unless executed. Missing mandatory live credentials/environment is `NOT_RUN_EXTERNAL_DEPENDENCY`, not PASS.
 
-If a required command cannot run because of missing external credentials/environment, classify it explicitly as `NOT_RUN_EXTERNAL_DEPENDENCY`; do not convert it to PASS. Normal CI must use mocks/fakes where required by the plan.
+## Severity
+- `BLOCKER`: merge prohibited: security/data-loss risk, broken acceptance criterion/check, critical hallucination, fabricated integration behavior, major architecture/runtime violation.
+- `MAJOR`: merge prohibited until fixed: significant correctness/reliability/test/docs/runtime defect.
+- `MINOR`: non-blocking improvement.
+- `NIT`: stylistic suggestion.
 
-## Finding Severity
+PASS requires zero BLOCKER and zero MAJOR findings plus all required gates.
 
-- `BLOCKER`: merge must not happen. Security vulnerability, data-loss risk, broken acceptance criterion, failing required check, critical hallucination, fabricated integration behavior, major architecture violation.
-- `MAJOR`: merge must not happen until fixed. Significant correctness/reliability/test/documentation defect.
-- `MINOR`: non-blocking improvement with low product risk.
-- `NIT`: stylistic/non-functional suggestion.
-
-`PASS` is allowed only when there are zero BLOCKER and zero MAJOR findings and all required merge gates are satisfied.
-
-## Required Review Output
-
-Produce both a human-readable review and this machine-readable block:
+## Required Output
+Produce human-readable findings and:
 
 ```yaml
 phase: <number>
 verdict: PASS | FAIL
 acceptance_criteria: PASS | FAIL
 architecture: PASS | FAIL
+runtime_compose: PASS | FAIL | NOT_APPLICABLE
 security: PASS | FAIL
 tests: PASS | FAIL
 documentation: PASS | FAIL
 regression: PASS | FAIL
-blocking_findings:
-  - severity: BLOCKER | MAJOR
-    file: <path or null>
-    line: <line or null>
-    summary: <short summary>
-non_blocking_findings:
-  - severity: MINOR | NIT
-    file: <path or null>
-    line: <line or null>
-    summary: <short summary>
+blocking_findings: []
+non_blocking_findings: []
 verification:
   install: PASS | FAIL | NOT_RUN
   lint: PASS | FAIL | NOT_RUN
   typecheck: PASS | FAIL | NOT_RUN
   test: PASS | FAIL | NOT_RUN
   build: PASS | FAIL | NOT_RUN
+  compose_config: PASS | FAIL | NOT_RUN | NOT_APPLICABLE
+  compose_smoke: PASS | FAIL | NOT_RUN | NOT_APPLICABLE
 merge_allowed: true | false
 ```
 
-`merge_allowed: true` requires `verdict: PASS`, all phase acceptance criteria satisfied, zero BLOCKER/MAJOR findings, and all required CI checks green.
-
 ## Fix Loop
+On FAIL, do not merge. Fix every BLOCKER/MAJOR on the same phase branch, rerun CI, then rerun this review from the beginning. Never disable or weaken checks to manufacture PASS.
 
-If review FAILS:
-1. Do not merge.
-2. Post actionable findings on the PR.
-3. Return to the same phase branch.
-4. Fix findings without disabling checks or weakening tests/types/security.
-5. Push changes.
-6. Re-run CI.
-7. Run this review again from the beginning.
-
-Repeat until PASS or until an external/manual blocker is reached.
-
-## Approval / Auto-Merge Contract
-
-After PASS:
-1. Ensure the PR is not draft and targets `main`.
-2. Ensure all required GitHub checks are green.
-3. Ensure the PR branch follows `phase/<number>-<slug>`.
-4. Add the label `phase-review:pass` (create it if repository permissions allow and it does not exist).
-5. Enable squash auto-merge; do not bypass required checks or branch protection.
-
-If repository settings do not permit auto-merge, report the exact blocker rather than merging by bypass.
+## Merge Contract
+After PASS, ensure the PR targets `main` and required GitHub checks are green. Follow GitHub's current Copilot/cloud-agent merge and human-review restrictions. Never bypass branch protection, platform security controls or required human actions. If GitHub requires human review/merge, report the PR as ready rather than pretending it was merged.
 
 ## Production Boundary
-
-Phases 0-24 may auto-merge after all gates pass.
-
-Phase 25 is different: code/configuration/documentation may merge after Production Readiness Review passes, but production deployment requires explicit human approval. Never auto-deploy production solely because this skill returned PASS.
+Phase 25 may reach release-candidate status after Production Readiness Review. Production deployment always requires explicit human approval.

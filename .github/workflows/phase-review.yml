@@ -18,8 +18,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate phase metadata
+      - name: Detect phase PR
+        id: phase
         if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_REF" =~ ^phase/ ]]; then
+            echo "is_phase=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_phase=false" >> "$GITHUB_OUTPUT"
+            echo "Non-phase PR: phase-specific metadata validation is not applicable."
+          fi
+
+      - name: Validate phase metadata
+        if: github.event_name == 'pull_request' && steps.phase.outputs.is_phase == 'true'
         shell: bash
         env:
           HEAD_REF: ${{ github.head_ref }}
@@ -69,7 +84,7 @@ jobs:
       - name: Explain merge contract
         run: |
           cat <<'EOF'
-          This workflow validates the repository's phase-review contract.
-          The Copilot agent must execute the phase-code-review skill after CI, fix all BLOCKER/MAJOR findings, and only request/enable merge when the review verdict is PASS.
+          For phase/* PRs this workflow validates phase metadata and the repository review contract.
+          For governance/maintenance PRs the phase metadata check is intentionally not applicable, while the review-skill contract remains validated.
           GitHub required checks / branch rules remain authoritative and must never be bypassed.
           EOF
