@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-policy:
+    name: Repository Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate phase branch and PR title
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_REF" =~ ^phase/[0-9]{2}-[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "Phase PR branches must match phase/NN-short-slug; got: $HEAD_REF"
+            exit 1
+          fi
+          if [[ ! "$PR_TITLE" =~ ^Phase\ [0-9]+:\ .+ ]]; then
+            echo "Phase PR titles must match 'Phase N: title'; got: $PR_TITLE"
+            exit 1
+          fi
+
+      - name: Ensure core governance files exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f AGENTS.md
+          test -f MASTER_IMPLEMENTATION_PLAN.md
+          test -f .github/skills/phase-code-review/SKILL.md
+          test -f docs/DEVELOPMENT_WORKFLOW.md
+
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect workspace bootstrap state
+        id: workspace
+        shell: bash
+        run: |
+          if [[ -f package.json && -f pnpm-lock.yaml ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Workspace is not bootstrapped yet; full JS quality gate becomes mandatory once Phase 0 creates package.json and pnpm-lock.yaml."
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.workspace.outputs.ready == 'true'
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        if: steps.workspace.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        if: steps.workspace.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: steps.workspace.outputs.ready == 'true'
+        run: pnpm lint
+
+      - name: Typecheck
+        if: steps.workspace.outputs.ready == 'true'
+        run: pnpm typecheck
+
+      - name: Test
+        if: steps.workspace.outputs.ready == 'true'
+        run: pnpm test
+
+      - name: Build
+        if: steps.workspace.outputs.ready == 'true'
+        run: pnpm build
+
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
