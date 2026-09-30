@@ -23,6 +23,7 @@ RUN pnpm --filter @lhu/admin build
 FROM node:22-alpine AS runner
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 WORKDIR /workspace
 COPY --from=build /workspace /workspace
 ENV NODE_ENV=production
