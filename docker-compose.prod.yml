@@ -15,7 +15,7 @@ services:
       dockerfile: Dockerfile
     environment:
       BOT_SERVICE_ROLE: api
-      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
+      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
       NODE_ENV: production
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: webhook
@@ -31,7 +31,7 @@ services:
       dockerfile: Dockerfile
     environment:
       BOT_SERVICE_ROLE: worker
-      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
+      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
       NODE_ENV: production
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: webhook
