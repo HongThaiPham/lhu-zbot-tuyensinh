@@ -85,8 +85,8 @@ wait_for_http_success() {
   done
 }
 
-API_BASE_URL="http://localhost:${BOT_API_PORT:-4201}"
-ADMIN_BASE_URL="http://localhost:${ADMIN_PORT:-4100}"
+API_BASE_URL="http://127.0.0.1:${BOT_API_PORT:-4201}"
+ADMIN_BASE_URL="http://127.0.0.1:${ADMIN_PORT:-4100}"
 
 echo "Project: ${PROJECT_NAME}"
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up --build -d
