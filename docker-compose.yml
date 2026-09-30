@@ -1,8 +1,8 @@
 services:
   admin:
     build:
-      context: ./apps/admin
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/admin/Dockerfile
     depends_on:
       bot-api:
         condition: service_started
@@ -14,8 +14,8 @@ services:
 
   bot-api:
     build:
-      context: ./apps/bot-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/bot-service/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     environment:
       BOT_SERVICE_ROLE: api
-      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
+      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: polling
@@ -32,8 +32,8 @@ services:
 
   bot-worker:
     build:
-      context: ./apps/bot-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/bot-service/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
         condition: service_healthy
     environment:
       BOT_SERVICE_ROLE: worker
-      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
+      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: polling
