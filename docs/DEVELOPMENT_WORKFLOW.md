@@ -19,31 +19,29 @@ READY
   -> NEXT_PHASE_READY
 ```
 
-A phase must never be marked complete until its PR is merged into `main`.
+A phase is not complete until its PR is merged into `main`.
 
-## Branch and PR Convention
+## Phase Identity and Branches
 
-Branch:
-
-```text
-phase/<NN>-<short-slug>
-```
-
-Examples:
-
-```text
-phase/00-repository-bootstrap
-phase/01-configuration-foundation
-phase/06-production-webhook
-```
-
-PR title:
+The authoritative phase identifier is the PR title:
 
 ```text
 Phase <N>: <phase title>
 ```
 
-Every PR body must include:
+GitHub Copilot Cloud Agent MUST work on the GitHub-managed branch assigned to its task/session, normally `copilot/*`. It must not change the remote, introduce a PAT, or attempt to create/push a custom `phase/*` branch when the platform does not permit that operation.
+
+Human/local agents may use:
+
+```text
+phase/<NN>-<short-slug>
+```
+
+Examples: `phase/00-repository-bootstrap`, `phase/01-configuration-foundation`.
+
+Branch names are transport details; phase ordering and acceptance are determined by the PR title, master-plan phase, PR body, CI and review evidence.
+
+Every phase PR body must include:
 
 ```markdown
 ## Phase
@@ -60,6 +58,7 @@ Phase N — Name
 - `pnpm typecheck`: PASS/FAIL
 - `pnpm test`: PASS/FAIL
 - `pnpm build`: PASS/FAIL
+- `docker compose config`: PASS/FAIL/NOT APPLICABLE
 
 ## Migrations
 None / list
@@ -78,26 +77,25 @@ None / list
 
 For Phase N:
 
-1. Update local `main`.
-2. Confirm all previous phases are merged.
-3. Read `AGENTS.md`, this workflow and Phase N in the master plan.
-4. Check current authoritative docs required by the phase.
-5. Create `phase/<NN>-<slug>` from current `main`.
-6. Implement only Phase N plus unavoidable prerequisites.
-7. Add/update tests and docs in the same branch.
-8. Run all relevant local verification.
-9. Commit/push.
-10. Open PR to `main`.
-11. Wait for CI.
-12. Invoke `.github/skills/phase-code-review/SKILL.md` against the complete PR diff.
-13. If FAIL, fix on the same branch and repeat CI + review.
-14. If PASS and all required checks are green, enable squash auto-merge.
-15. Never bypass required checks/branch protection.
-16. After GitHub reports the PR merged, refresh `main` and begin Phase N+1.
+1. Confirm latest `main` and all previous phases are merged.
+2. Read `AGENTS.md`, this workflow and Phase N in the master plan.
+3. Check authoritative external docs required by the phase.
+4. Use the current agent's permitted working branch. Copilot Cloud Agent keeps its GitHub-managed `copilot/*` branch; human/local agents may create `phase/<NN>-<slug>`.
+5. Implement only Phase N plus unavoidable prerequisites.
+6. Add/update tests and docs.
+7. Run all relevant local verification.
+8. Commit using the platform-supported mechanism.
+9. Create/update a PR to `main` titled `Phase N: <phase title>`.
+10. Wait for CI.
+11. Invoke `.github/skills/phase-code-review/SKILL.md` against the complete PR diff.
+12. If FAIL, fix on the same PR branch and repeat CI + review.
+13. If PASS and all required checks are green, mark/report the phase ready for the merge action permitted by GitHub.
+14. Never bypass required checks, branch protection, Copilot platform restrictions or human gates.
+15. Only after GitHub reports the PR merged may Phase N+1 begin.
 
 ## Merge Gates
 
-A phase PR may merge only when all of these are true:
+A phase PR may merge only when all applicable gates are true:
 
 ```text
 phase acceptance criteria == PASS
@@ -107,48 +105,36 @@ lint == PASS
 typecheck == PASS
 tests == PASS
 build == PASS
+docker compose checks == PASS where applicable
 phase-specific required checks == PASS
 ```
 
-If a check is not applicable, that must be explicitly justified by the phase specification; it must not silently disappear.
+If a check is not applicable, explicitly justify it; do not silently omit it.
 
 ## Self-Review Safety
 
-The implementation agent may invoke the review skill, but it must treat review as a fresh adversarial pass:
-- inspect the actual diff rather than its own summary;
-- rerun verification;
-- actively search for counterexamples and failure paths;
-- report blocking findings even when it authored the code;
-- never edit the review criteria to make its PR pass.
+The implementation agent may invoke the review skill, but must treat review as a fresh adversarial pass: inspect the actual diff, rerun verification, search for counterexamples/failure paths, report blocking findings even when it authored the code, and never edit review criteria to manufacture PASS.
 
-GitHub branch/ruleset protection and required checks are the final enforcement boundary. The agent must never bypass them.
+GitHub branch/ruleset protection and required checks are the final enforcement boundary.
+
+## Copilot Cloud Agent Boundary
+
+Do not solve Copilot Cloud Agent branch/authentication restrictions by changing `origin`, embedding credentials, adding PATs or bypassing GitHub controls. If GitHub requires a human merge/review or a new task after merge, stop cleanly at the corresponding READY state and report the required human/platform action.
 
 ## CI Bootstrap
 
-The repository begins before Phase 0 has created the pnpm workspace. `.github/workflows/ci.yml` therefore contains a bootstrap guard. Once `package.json` and `pnpm-lock.yaml` exist, full CI becomes mandatory automatically.
-
-Phase 0 must leave full CI green.
+Before Phase 0 creates the pnpm workspace, `.github/workflows/ci.yml` uses a bootstrap guard. Once `package.json` and `pnpm-lock.yaml` exist, full CI is mandatory. Phase 0 must leave full CI green.
 
 ## External Integrations
 
-Normal PR CI must not require paid/live external services. Use mocks/fakes/test containers as specified. Staging/live validation is required only in phases that explicitly require it.
-
-Never put Zalo Bot Token, provider API keys, encryption keys or production credentials in repository files, workflow YAML, PR bodies, logs or test fixtures. Use GitHub/environment secrets for live staging/release checks.
+Normal PR CI must not require paid/live external services. Use mocks/fakes/test containers as specified. Never put Zalo Bot Token, provider API keys, encryption keys or production credentials in repository files, workflow YAML, PR bodies, logs or fixtures.
 
 ## Phase 25 / Production
 
-Phase 25 must perform Production Readiness Review including staging E2E, security gate, RAG evaluation, migration/restore validation, observability, rollback/runbook and the full Zalo -> queue -> conversation -> admissions/RAG -> LLM -> Zalo path.
+Phase 25 performs Production Readiness Review including staging E2E, security gate, RAG evaluation, migration/restore validation, observability, rollback/runbook and the full Zalo -> queue -> conversation -> admissions/RAG -> LLM -> Zalo path.
 
-Phase 25's PR may merge when gates pass, but production deployment is a separate action protected by a GitHub Environment named `production` with required human reviewers. The agent must never auto-approve its own production deployment.
+Production deployment is a separate human-approved action. The agent must never auto-approve its own production deployment.
 
 ## Failure / Stop Conditions
 
-Stop autonomous progression and report a blocker when:
-- current official documentation is ambiguous enough that implementation correctness cannot be established;
-- required external credentials or repository permissions are unavailable for a phase's mandatory live check;
-- a destructive migration requires a product/operations decision;
-- a security BLOCKER cannot be resolved safely;
-- a required GitHub check cannot be configured/enforced with available permissions;
-- staging does not satisfy Phase 24/25 release criteria.
-
-Do not skip a phase to work around a blocker.
+Stop and report a blocker when authoritative docs are materially ambiguous; mandatory credentials/permissions are unavailable; a destructive migration requires a human decision; a security BLOCKER cannot be safely resolved; a required GitHub gate cannot be enforced; staging fails Phase 24/25 criteria; or the platform requires a human/new task action. Never skip a phase to work around a blocker.
