@@ -12,11 +12,13 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 15s
+    restart: unless-stopped
+    user: "1000:1000"
 
   bot-api:
     build:
@@ -29,7 +31,7 @@ services:
         condition: service_healthy
     environment:
       BOT_SERVICE_ROLE: api
-      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
+      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: polling
@@ -41,6 +43,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    restart: unless-stopped
+    user: "1000:1000"
 
   bot-worker:
     build:
@@ -53,10 +57,12 @@ services:
         condition: service_healthy
     environment:
       BOT_SERVICE_ROLE: worker
-      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
+      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: polling
+    restart: unless-stopped
+    user: "1000:1000"
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -74,6 +80,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -87,6 +94,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
 
 volumes:
   postgres_data:

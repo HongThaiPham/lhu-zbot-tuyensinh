@@ -47,14 +47,24 @@ async function getReadinessState() {
   const dbTarget = parseSocketTarget(process.env.DATABASE_URL, 5432);
   const redisTarget = parseSocketTarget(process.env.REDIS_URL, 6379);
 
-  const dbReady = dbTarget ? await probeTcp(dbTarget.host, dbTarget.port) : false;
-  const redisReady = redisTarget ? await probeTcp(redisTarget.host, redisTarget.port) : false;
+  if (!dbTarget || !redisTarget) {
+    return {
+      ready: false,
+      dependencies: {
+        postgres: dbTarget ? { host: dbTarget.host, port: dbTarget.port, ready: false } : { ready: false },
+        redis: redisTarget ? { host: redisTarget.host, port: redisTarget.port, ready: false } : { ready: false },
+      },
+    };
+  }
+
+  const dbReady = await probeTcp(dbTarget.host, dbTarget.port);
+  const redisReady = await probeTcp(redisTarget.host, redisTarget.port);
 
   return {
     ready: dbReady && redisReady,
     dependencies: {
-      postgres: dbTarget ? { host: dbTarget.host, port: dbTarget.port, ready: dbReady } : { ready: false },
-      redis: redisTarget ? { host: redisTarget.host, port: redisTarget.port, ready: redisReady } : { ready: false },
+      postgres: { host: dbTarget.host, port: dbTarget.port, ready: dbReady },
+      redis: { host: redisTarget.host, port: redisTarget.port, ready: redisReady },
     },
   };
 }
