@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate phase branch and PR title
+      - name: Validate PR branch policy
         if: github.event_name == 'pull_request'
         shell: bash
         env:
@@ -31,13 +31,21 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
-          if [[ ! "$HEAD_REF" =~ ^phase/[0-9]{2}-[a-z0-9][a-z0-9-]*$ ]]; then
-            echo "Phase PR branches must match phase/NN-short-slug; got: $HEAD_REF"
-            exit 1
-          fi
-          if [[ ! "$PR_TITLE" =~ ^Phase\ [0-9]+:\ .+ ]]; then
-            echo "Phase PR titles must match 'Phase N: title'; got: $PR_TITLE"
-            exit 1
+          if [[ "$HEAD_REF" =~ ^phase/ ]]; then
+            if [[ ! "$HEAD_REF" =~ ^phase/[0-9]{2}-[a-z0-9][a-z0-9-]*$ ]]; then
+              echo "Phase PR branches must match phase/NN-short-slug; got: $HEAD_REF"
+              exit 1
+            fi
+            if [[ ! "$PR_TITLE" =~ ^Phase\ [0-9]+:\ .+ ]]; then
+              echo "Phase PR titles must match 'Phase N: title'; got: $PR_TITLE"
+              exit 1
+            fi
+          else
+            if [[ ! "$HEAD_REF" =~ ^(chore|docs|fix|ci)/[a-z0-9][a-z0-9-]*$ ]]; then
+              echo "Non-phase PR branches must use chore/, docs/, fix/, or ci/ with a lowercase slug; got: $HEAD_REF"
+              exit 1
+            fi
+            echo "Non-phase governance/maintenance PR accepted: $HEAD_REF"
           fi
 
       - name: Ensure core governance files exist
@@ -105,7 +113,25 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
+      - name: Detect dependency manifests
+        id: manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find . -type f \( -name 'package.json' -o -name 'pnpm-lock.yaml' -o -name 'package-lock.json' -o -name 'yarn.lock' \) -not -path './.git/*' | grep -q .; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency manifest/lockfile exists before Phase 0; dependency review will become mandatory after workspace bootstrap."
+          fi
+
       - name: Dependency review
+        if: steps.manifests.outputs.present == 'true'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
+
+      - name: Dependency review bootstrap notice
+        if: steps.manifests.outputs.present != 'true'
+        run: echo "Dependency Review PASS (bootstrap state: no dependency manifests yet)."
