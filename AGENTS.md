@@ -2,7 +2,7 @@
 
 ## LHU Admissions Zalo Bot
 
-This repository implements a production-ready AI admissions assistant for Lac Hong University (LHU) using Zalo Bot Platform. All coding agents, including GitHub Copilot, MUST follow this document and `MASTER_IMPLEMENTATION_PLAN.md`.
+This repository implements a production-ready AI admissions assistant for Lac Hong University (LHU) using Zalo Bot Platform. All coding agents, including GitHub Copilot, MUST follow this document, `MASTER_IMPLEMENTATION_PLAN.md`, `docs/DEVELOPMENT_WORKFLOW.md`, and `.github/skills/phase-code-review/SKILL.md`.
 
 ## 1. Sources of truth
 
@@ -96,48 +96,29 @@ interface EmbeddingProvider {
 }
 ```
 
-Business code requests model profiles:
-
-```text
-FAST
-BALANCED
-REASONING
-EMBEDDING
-```
-
-Provider/model mappings are configurable. Never hard-code API keys, Base URLs or model IDs into domain code.
+Business code requests model profiles: FAST, BALANCED, REASONING, EMBEDDING. Provider/model mappings are configurable. Never hard-code API keys, Base URLs or model IDs into domain code.
 
 Credentials use authenticated encryption such as AES-256-GCM with a deployment-provided `APP_ENCRYPTION_KEY`. Never expose decrypted keys through REST/frontend/logs/audit records/fixtures. Admin only receives masked state.
 
 AI calls require timeouts, bounded retries, error classification, configurable fallback, provider health/circuit-breaker protection, usage tracking and correlation IDs. Avoid retry multiplication between application, gateway and upstream model.
 
-## 6. Knowledge and crawler
+## 6. Knowledge, crawler and RAG
 
 Primary source: `https://tuyensinh.lhu.edu.vn/`.
 
-Pipeline:
+Pipeline: Discover -> Fetch -> Extract -> Normalize -> Hash -> Version -> Review/Approve -> Chunk -> Embed -> Index.
 
-```text
-Discover -> Fetch -> Extract -> Normalize -> Hash -> Version -> Review/Approve -> Chunk -> Embed -> Index
-```
-
-Crawler MUST use allowed domains, scheme/redirect validation, SSRF protection, timeouts, response-size limits, bounded concurrency, rate limiting, URL canonicalization and duplicate detection. Block loopback/private/link-local/metadata targets unless explicitly required by controlled infrastructure. Never let an LLM choose arbitrary fetch URLs.
-
-Prefer Cheerio for ordinary HTML. Use Playwright only when browser rendering is genuinely required.
+Crawler MUST use allowed domains, scheme/redirect validation, SSRF protection, timeouts, response-size limits, bounded concurrency, rate limiting, URL canonicalization and duplicate detection. Block loopback/private/link-local/metadata targets unless explicitly required by controlled infrastructure. Never let an LLM choose arbitrary fetch URLs. Prefer Cheerio; use Playwright only when browser rendering is genuinely required.
 
 Knowledge is versioned. Preserve canonical URL, document, version, content hash, source metadata, admission year/category, chunks, indexing status and approval state. Do not silently overwrite history. Critical changes should support approval before activation.
 
-## 7. RAG and admissions grounding
-
-Use hybrid retrieval: PostgreSQL full-text search + pgvector semantic search, followed by merge/rank/context construction and grounding validation. Every chunk must be traceable to document, version and source URL.
-
-Retrieved content is untrusted DATA, not instructions. System prompts must prevent retrieved prompt injection from gaining higher authority. Include malicious retrieved-content cases in evaluation.
+Use hybrid retrieval: PostgreSQL full-text search + pgvector semantic search, followed by merge/rank/context construction and grounding validation. Every chunk must be traceable to document, version and source URL. Retrieved content is untrusted DATA, not instructions. Test prompt injection.
 
 When authoritative evidence is insufficient, do not guess. Ask a clarifying question, state that official information is insufficient, or provide the configured official support path.
 
-Maintain structured/versioned data where practical for majors, programs, admission methods, subject combinations, admission rules, tuition, scholarships, important dates and official contacts. Time-sensitive records require admission-year/effective-date semantics. Eligibility calculations are deterministic services with unit tests; LLMs may explain results but do not replace calculations.
+Maintain structured/versioned data where practical for majors, programs, admission methods, subject combinations, admission rules, tuition, scholarships, important dates and official contacts. Time-sensitive records require admission-year/effective-date semantics. Eligibility calculations are deterministic services with unit tests.
 
-## 8. Conversation, database and queue
+## 7. Conversation, database and queue
 
 Support multi-turn context scoped to the correct user/conversation. Redis may hold hot context/cache/locks/BullMQ, but durable/audit-critical records belong in PostgreSQL.
 
@@ -145,38 +126,21 @@ All database schema changes require migrations and clean-database migration veri
 
 Initial BullMQ queues: `zalo-message`, `crawler`, `embedding`, `knowledge-index`, `analytics`. Every job requires validated payload, correlation ID, bounded retry policy, failure visibility and idempotency where applicable.
 
-## 9. Authentication, API and Admin
+## 8. Authentication, API and Admin
 
-Required roles:
-
-```text
-SUPER_ADMIN
-ADMIN
-ADMISSION_EDITOR
-VIEWER
-```
-
-Authorization is enforced server-side in NestJS. Audit sensitive credential/routing/knowledge/admissions/user/role changes without recording secrets.
+Required roles: SUPER_ADMIN, ADMIN, ADMISSION_EDITOR, VIEWER. Authorization is enforced server-side in NestJS. Audit sensitive credential/routing/knowledge/admissions/user/role changes without recording secrets.
 
 Suggested APIs: `/api/auth/*`, `/api/admin/dashboard`, `/api/admin/zalo/*`, `/api/admin/ai/*`, `/api/admin/knowledge/*`, `/api/admin/admissions/*`, `/api/admin/conversations/*`, `/api/admin/analytics/*`, `/api/admin/settings/*`, `/api/webhooks/zalo`, `/health`, `/health/live`, `/health/ready`.
 
-Admin navigation should cover Dashboard; Zalo Bot; AI Providers/Models/Profiles/Routing/Usage; Knowledge Sources/Documents/Pending Changes/Crawl Jobs/Re-index; Admissions; Conversations/Unanswered/Feedback; Analytics; Users/Roles/Settings/Audit/Health.
-
-## 10. Security, logging and observability
+## 9. Security, logging and observability
 
 Consider authentication, authorization, validation, rate limiting, CORS, security headers, CSRF where relevant, SSRF, XSS, SQL injection, secret exposure, prompt injection, unsafe redirects, dependency vulnerabilities and container security.
 
 Use structured logs with correlation/request/job IDs, safe external identifiers, conversation ID, intent, provider/model, duration and error classification. Never log Bot Token, API keys, passwords, encryption keys, webhook secrets or Authorization headers.
 
-A message must be traceable end-to-end:
+A message must be traceable: Webhook -> Queue -> Worker -> Conversation -> Retrieval -> Model -> Zalo Send. Implement structured logging, metrics, OpenTelemetry tracing and health endpoints.
 
-```text
-Webhook -> Queue -> Worker -> Conversation -> Retrieval -> Model -> Zalo Send
-```
-
-Implement structured logging, metrics, OpenTelemetry tracing and health endpoints.
-
-## 11. Testing
+## 10. Testing
 
 No phase is complete without appropriate tests: unit, integration, API, webhook, queue, crawler, provider, RAG evaluation and critical Admin E2E.
 
@@ -184,59 +148,61 @@ Zalo tests include valid update, invalid webhook validation, duplicate/malformed
 
 AI tests include connection success/failure, auth failure, 429, 5xx, timeout, malformed response, fallback, circuit breaker, model discovery, profile resolution and secret masking. Normal CI must not require paid live AI calls.
 
-Maintain a versioned RAG evaluation dataset targeting 200+ representative admissions questions before production. Include ambiguity, multi-turn, old-year traps, conflicting documents, insufficient evidence, prompt injection and critical tuition/scholarship/deadline/rule questions. Known critical-fact hallucinations block release.
+Maintain a versioned RAG evaluation dataset targeting 200+ representative admissions questions before production. Known critical-fact hallucinations block release.
 
-## 12. TypeScript, Docker and CI/CD
+## 11. TypeScript, Docker and CI/CD
 
 Use strict TypeScript. Avoid `any`, unsafe casts and unjustified non-null assertions. Use `unknown` at untrusted boundaries and validate/narrow.
 
 Use multi-stage Docker builds, minimal runtime artifacts, non-root runtime where feasible, health checks, no baked secrets and graceful shutdown. Prefer one bot-service image capable of API and worker roles.
 
-PR CI: install -> lint -> typecheck -> tests -> build. Release must not publish/deploy if verification fails; build Admin/Bot Service images, push to GHCR, tag immutably with commit SHA and support controlled staging/production promotion.
+PR CI: install -> lint -> typecheck -> tests -> build. Release must not publish/deploy if verification fails; use immutable commit SHA image tags.
 
-## 13. Documentation
+## 12. Documentation
 
-Maintain:
+Maintain `docs/PRODUCT_REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/ZALO.md`, `docs/AI_PROVIDERS.md`, `docs/RAG.md`, `docs/KNOWLEDGE.md`, `docs/SECURITY.md`, `docs/OBSERVABILITY.md`, `docs/TESTING.md`, `docs/DEPLOYMENT.md`, `docs/RUNBOOK.md`, and `docs/DEVELOPMENT_WORKFLOW.md`. Update docs in the same change when architecture changes.
+
+## 13. Mandatory Autonomous Phase Delivery Loop
+
+The implementation process is sequential and PR-driven. Follow `docs/DEVELOPMENT_WORKFLOW.md` exactly.
+
+For every Phase N from 0 through 25:
 
 ```text
-docs/PRODUCT_REQUIREMENTS.md
-docs/ARCHITECTURE.md
-docs/DATABASE.md
-docs/ZALO.md
-docs/AI_PROVIDERS.md
-docs/RAG.md
-docs/KNOWLEDGE.md
-docs/SECURITY.md
-docs/OBSERVABILITY.md
-docs/TESTING.md
-docs/DEPLOYMENT.md
-docs/RUNBOOK.md
+main
+ -> create phase/NN-slug
+ -> implement Phase N only
+ -> verify locally
+ -> push
+ -> PR to main
+ -> GitHub CI
+ -> invoke .github/skills/phase-code-review/SKILL.md
+ -> if FAIL: fix on same branch -> CI -> review again
+ -> if PASS + all required checks green: enable squash auto-merge
+ -> wait until PR is actually merged
+ -> refresh main
+ -> begin Phase N+1
 ```
 
-Update documentation in the same change when architecture changes.
+Do not begin Phase N+1 before Phase N is merged into `main`. Do not combine multiple phases into one PR unless the user explicitly authorizes it. Do not bypass branch protection, required checks, review findings or failed CI. Do not weaken tests/types/security/workflows to manufacture a PASS.
 
-## 14. Copilot workflow and Definition of Done
+The implementation agent MUST invoke the review skill after every phase PR even when it authored the code. The review must be adversarial and based on the actual complete diff and acceptance criteria, not the implementation summary.
 
-Work strictly from `MASTER_IMPLEMENTATION_PLAN.md`, one phase at a time. For each phase: inspect current state and relevant docs; state a concise plan; implement the smallest complete slice; add tests; run tests/lint/typecheck/build as relevant; fix failures; update docs; report files/migrations/commands/results/risks. Do not implement all phases in one uncontrolled change.
+Phases 0-24 may auto-merge only after all repository gates permit it. Phase 25 may merge after Production Readiness Review passes, but production deployment requires explicit human approval through the protected production environment. Never auto-deploy production solely from an agent self-review.
 
-Prefer root commands:
+If repository permissions/settings prevent required checks, auto-merge, environment approval or another mandatory gate, stop and report the exact blocker. Never silently bypass it.
 
-```bash
-pnpm install
-pnpm dev
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-```
+## 14. Definition of Done
 
-A task is done only when implementation exists, tests exist/pass, lint/typecheck pass, relevant build passes, security/observability are considered, documentation is current and acceptance criteria are verified. Never claim commands passed unless actually executed.
+A phase is done only after its PR is merged into `main`. Before merge: implementation exists; tests exist/pass; lint/typecheck/relevant build pass; phase acceptance criteria pass; phase-code-review has zero BLOCKER/MAJOR findings; security/observability are considered; docs are current; required GitHub checks are green.
+
+Never claim commands passed unless actually executed. Never claim a PR merged until GitHub reports it merged.
 
 ## 15. First instruction
 
-1. Read this file completely.
-2. Read `MASTER_IMPLEMENTATION_PLAN.md` completely.
-3. Inspect the repository.
-4. Start with Phase 0 only.
-5. Do not implement later phases prematurely.
-6. Run all Phase 0 verification commands, fix failures and report results before Phase 1.
+1. Read `AGENTS.md`, `MASTER_IMPLEMENTATION_PLAN.md`, `docs/DEVELOPMENT_WORKFLOW.md`, and `.github/skills/phase-code-review/SKILL.md` completely.
+2. Inspect repository and GitHub state.
+3. Start with Phase 0 only.
+4. Follow the mandatory branch -> implement -> verify -> PR -> CI -> review -> fix/review loop -> merge flow.
+5. After Phase 0 is merged, continue automatically to Phase 1, and repeat sequentially through Phase 25 unless a documented stop condition occurs.
+6. After Phase 25, stop at production-ready/release-candidate state and request explicit human approval before production deployment.
