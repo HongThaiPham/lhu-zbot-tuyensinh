@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -145,4 +146,6 @@ jobs:
 
       - name: Dependency review bootstrap notice
         if: steps.manifests.outputs.present != 'true'
-        run: echo "Dependency Review PASS (bootstrap state: no dependency manifests yet)."
+        shell: bash
+        run: |
+          echo "Dependency Review PASS (bootstrap state: no dependency manifests yet)."
