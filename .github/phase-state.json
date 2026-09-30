@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "currentPhase": 0,
+  "lastMergedPhase": null,
+  "status": "READY",
+  "activeBranch": null,
+  "activePullRequest": null,
+  "releaseReady": false,
+  "productionDeploymentApproved": false,
+  "note": "Coordination metadata only. GitHub PR merge state and required checks are authoritative."
+}
