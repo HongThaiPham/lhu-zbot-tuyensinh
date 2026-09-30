@@ -5,6 +5,21 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-lhu-zbot-phase0-smoke-$(date +%s)-$$}"
 export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
 
+pick_free_port() {
+  python - <<'PY'
+import socket
+s = socket.socket()
+s.bind(('127.0.0.1', 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+export ADMIN_PORT="${ADMIN_PORT:-$(pick_free_port)}"
+export BOT_API_PORT="${BOT_API_PORT:-$(pick_free_port)}"
+export POSTGRES_PORT="${POSTGRES_PORT:-$(pick_free_port)}"
+export REDIS_PORT="${REDIS_PORT:-$(pick_free_port)}"
+
 cleanup() {
   echo "Cleaning up Compose project ${PROJECT_NAME}"
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -70,14 +85,17 @@ wait_for_http_success() {
   done
 }
 
+API_BASE_URL="http://localhost:${BOT_API_PORT:-4201}"
+ADMIN_BASE_URL="http://localhost:${ADMIN_PORT:-4100}"
+
 echo "Project: ${PROJECT_NAME}"
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up --build -d
 
 wait_for_healthy postgres 120
 wait_for_healthy redis 120
-wait_for_http_success http://localhost:3001/health/live 120
-wait_for_http_status http://localhost:3001/health/ready 200 120
-wait_for_http_status http://localhost:3000/health 200 120
+wait_for_http_success "${API_BASE_URL}/health/live" 120
+wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
+wait_for_http_status "${ADMIN_BASE_URL}/health" 200 120
 
 worker_id=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps -q bot-worker)
 if [[ -z "$worker_id" ]]; then
@@ -106,7 +124,7 @@ fi
 
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" stop postgres >/dev/null
 sleep 5
-status=$(curl -sS -o /tmp/phase0-readiness-fail.txt -w '%{http_code}' http://localhost:3001/health/ready || true)
+status=$(curl -sS -o /tmp/phase0-readiness-fail.txt -w '%{http_code}' "${API_BASE_URL}/health/ready" || true)
 if [[ "$status" =~ ^2 ]]; then
   echo "Readiness unexpectedly succeeded while PostgreSQL was stopped" >&2
   print_diag
@@ -115,7 +133,7 @@ fi
 
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d postgres >/dev/null
 wait_for_healthy postgres 120
-wait_for_http_status http://localhost:3001/health/ready 200 120
+wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
 
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null
 
