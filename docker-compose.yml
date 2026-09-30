@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     environment:
       BOT_SERVICE_ROLE: api
-      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
+      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: polling
@@ -41,7 +41,7 @@ services:
         condition: service_healthy
     environment:
       BOT_SERVICE_ROLE: worker
-      DATABASE_URL: ******postgres:5432/lhu_zbot?schema=public
+      DATABASE_URL: "******postgres:5432/lhu_zbot?schema=public"
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       ZALO_UPDATE_MODE: polling
@@ -49,15 +49,15 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: lhu_zbot
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-lhu_zbot}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lhu_zbot"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-lhu_zbot}"]
       interval: 10s
       timeout: 5s
       retries: 10
