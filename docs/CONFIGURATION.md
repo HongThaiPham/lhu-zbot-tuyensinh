@@ -33,6 +33,7 @@
 - `ADMIN_ORIGIN` — allowed admin browser origin for authenticated state-changing requests (default in local: `http://127.0.0.1:4100`)
 - `LOGIN_RATE_LIMIT_WINDOW_SECONDS` — login failure throttle window (default: `300`)
 - `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` — max failed attempts in window before temporary block (default: `5`)
+- `TRUST_PROXY` (`true | false`) — whether to trust `X-Forwarded-For` for client IP extraction (default: `false`)
 - `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` — only used by explicit bootstrap command
 
 ### Admin
@@ -43,7 +44,7 @@
 ## Secret classification
 
 - Secret in Phase 3: `APP_ENCRYPTION_KEY`, `ADMIN_BOOTSTRAP_PASSWORD`
-- Public in Phase 1: `NEXT_PUBLIC_API_BASE_URL`
+- Public in Phase 3: `NEXT_PUBLIC_API_BASE_URL`
 
 `APP_ENCRYPTION_KEY` must never be logged or rendered in error output. Production startup fails if it is missing, empty, placeholder/default, too short, or malformed.
 

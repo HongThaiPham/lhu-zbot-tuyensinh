@@ -22,7 +22,6 @@ export class SessionAuthGuard implements CanActivate {
 
     const user = await this.authService.authenticateSession(token);
     request[REQUEST_USER_KEY] = user;
-    request.authUser = user;
     return true;
   }
 }

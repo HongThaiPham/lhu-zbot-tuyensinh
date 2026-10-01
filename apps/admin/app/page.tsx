@@ -33,7 +33,7 @@ export default async function HomePage() {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .map((cookie) => `${cookie.name}=${encodeURIComponent(cookie.value)}`)
     .join('; ');
 
   const currentUser = await getCurrentUser(cookieHeader);

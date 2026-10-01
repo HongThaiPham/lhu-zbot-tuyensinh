@@ -1,21 +1,25 @@
 import {
+  Inject,
   Injectable,
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import type { BotServiceConfig } from '@lhu/config';
 import type { RoleName } from '@prisma/client';
-import { loadBotServiceConfig } from '@lhu/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
 import { LoginAbuseService } from './login-abuse.service';
 import type { AuthenticatedUser } from './auth.types';
+import { BOT_SERVICE_CONFIG } from './auth.config';
 
 interface LoginContext {
   readonly ipAddress: string;
 }
 
 const AUTH_FAILURE_MESSAGE = 'Invalid credentials';
+const DUMMY_PASSWORD_HASH =
+  '$argon2id$v=19$m=19456,t=2,p=1$q166RlgDIyTzmQ/L+CGeuA$OJEyQYAY3XMbTwUb3G2VyH4mG86kTzV5n6+uDsJ8wrs';
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -24,9 +28,9 @@ export function normalizeEmail(email: string): string {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly config = loadBotServiceConfig(process.env);
 
   public constructor(
+    @Inject(BOT_SERVICE_CONFIG) private readonly config: BotServiceConfig,
     private readonly prisma: PrismaService,
     private readonly passwordService: PasswordService,
     private readonly sessionService: SessionService,
@@ -88,10 +92,9 @@ export class AuthService {
       },
     });
 
-    const valid =
-      user &&
-      user.status === 'ACTIVE' &&
-      (await this.passwordService.verifyPassword(user.passwordHash, password));
+    const passwordHashToVerify = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
+    const passwordMatches = await this.passwordService.verifyPassword(passwordHashToVerify, password);
+    const valid = Boolean(user && user.status === 'ACTIVE' && passwordMatches);
 
     if (!valid || !user) {
       this.loginAbuseService.recordFailure(
@@ -191,12 +194,17 @@ export class AuthService {
   }
 
   public getClientIp(forwardedForHeader: string | string[] | undefined, remoteAddress: string | undefined): string {
-    if (typeof forwardedForHeader === 'string' && forwardedForHeader.trim().length > 0) {
-      return forwardedForHeader.split(',')[0]?.trim() || 'unknown';
-    }
+    if (this.config.trustProxy) {
+      if (typeof forwardedForHeader === 'string' && forwardedForHeader.trim().length > 0) {
+        return forwardedForHeader.split(',')[0]?.trim() || 'unknown';
+      }
 
-    if (Array.isArray(forwardedForHeader) && forwardedForHeader.length > 0) {
-      return forwardedForHeader[0] || 'unknown';
+      if (Array.isArray(forwardedForHeader) && forwardedForHeader.length > 0) {
+        const candidate = forwardedForHeader[0];
+        if (candidate && candidate.trim().length > 0) {
+          return candidate.trim();
+        }
+      }
     }
 
     return remoteAddress || 'unknown';

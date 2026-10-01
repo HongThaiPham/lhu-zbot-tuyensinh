@@ -37,6 +37,22 @@ function buildAuthService(overrides: Partial<Record<string, unknown>> = {}) {
   const prisma = { client: prismaClient };
   const sessionService = new SessionService(prisma as never);
   const authService = new AuthService(
+    {
+      nodeEnv: 'test',
+      databaseUrl: process.env.DATABASE_URL as string,
+      redisUrl: process.env.REDIS_URL as string,
+      botServiceRole: 'api',
+      zaloUpdateMode: 'polling',
+      port: 3001,
+      appEncryptionKey: 'development-only-app-encryption-key-not-for-production',
+      sessionCookieName: 'lhu_admin_session',
+      sessionTtlSeconds: 1200,
+      adminOrigin: 'http://127.0.0.1:4100',
+      sessionCookieSameSite: 'lax',
+      loginRateLimitWindowSeconds: 300,
+      loginRateLimitMaxAttempts: 5,
+      trustProxy: false,
+    },
     prisma as never,
     passwordService,
     sessionService,

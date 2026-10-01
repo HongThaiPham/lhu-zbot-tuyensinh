@@ -5,24 +5,13 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-lhu-zbot-phase3-auth-$(date +%s)-$$}"
 export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
 
-pick_free_port() {
-  python - <<'PY'
-import socket
-s = socket.socket()
-s.bind(('127.0.0.1', 0))
-print(s.getsockname()[1])
-s.close()
-PY
-}
-
-export BOT_API_PORT="${BOT_API_PORT:-$(pick_free_port)}"
-export POSTGRES_PORT="${POSTGRES_PORT:-$(pick_free_port)}"
-export REDIS_PORT="${REDIS_PORT:-$(pick_free_port)}"
+export BOT_API_PORT="${BOT_API_PORT:-0}"
+export POSTGRES_PORT="${POSTGRES_PORT:-0}"
+export REDIS_PORT="${REDIS_PORT:-0}"
 
 POSTGRES_DB_NAME="${POSTGRES_DB:-lhu_zbot}"
 POSTGRES_USERNAME="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD_VALUE="${POSTGRES_PASSWORD:-postgres}"
-DATABASE_URL_VALUE="postgresql://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD_VALUE}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB_NAME}?schema=public"
 
 ADMIN_EMAIL="admin.phase3@example.com"
 ADMIN_PASSWORD="AdminStrongPass!123"
@@ -32,7 +21,7 @@ LIMITED_PASSWORD="LimitedStrongPass!123"
 TARGET_EMAIL="target.phase3@example.com"
 TARGET_PASSWORD="TargetStrongPass!123"
 ADMIN_ORIGIN="http://127.0.0.1:4100"
-API_BASE_URL="http://127.0.0.1:${BOT_API_PORT}"
+
 
 cleanup() {
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -94,6 +83,9 @@ docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d postgres redis
 wait_for_healthy postgres 120
 wait_for_healthy redis 120
 
+POSTGRES_HOST_PORT=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port postgres 5432 | awk -F: '{print $NF}')
+DATABASE_URL_VALUE="postgresql://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD_VALUE}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB_NAME}?schema=public"
+
 pnpm db:prisma:generate
 DATABASE_URL="$DATABASE_URL_VALUE" pnpm db:migrate:deploy
 DATABASE_URL="$DATABASE_URL_VALUE" pnpm db:seed
@@ -153,7 +145,9 @@ const prisma = new PrismaClient();
     throw new Error('bootstrap admin missing');
   }
 
-  process.stdout.write(JSON.stringify({ adminId: admin.id, limitedId: limited.id, targetId: target.id }));
+  void admin;
+  void limited;
+  void target;
 })().finally(async () => {
   await prisma.$disconnect();
 });
@@ -188,6 +182,8 @@ LIMITED_ID=$(printf '%s' "$IDENTIFIERS" | json_field "['limitedId']")
 TARGET_ID=$(printf '%s' "$IDENTIFIERS" | json_field "['targetId']")
 
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d bot-api
+BOT_API_HOST_PORT=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port bot-api 3001 | awk -F: '{print $NF}')
+API_BASE_URL="http://127.0.0.1:${BOT_API_HOST_PORT}"
 wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
 
 assert_status 401 "$(curl -sS -o /tmp/phase3-auth-body.txt -w '%{http_code}' "${API_BASE_URL}/auth/me")" "Unauthenticated /auth/me must be rejected"

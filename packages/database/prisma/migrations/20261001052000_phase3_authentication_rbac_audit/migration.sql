@@ -2,7 +2,7 @@
 CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'INACTIVE');
 
 -- CreateEnum
-CREATE TYPE "RoleName" AS ENUM ('ADMIN');
+CREATE TYPE "RoleName" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'ADMISSION_EDITOR', 'VIEWER');
 
 -- CreateTable
 CREATE TABLE "users" (

@@ -23,6 +23,7 @@ function buildBotEnv(overrides = {}) {
     ADMIN_ORIGIN: 'http://127.0.0.1:4100',
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: '300',
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: '5',
+    TRUST_PROXY: 'false',
     ...overrides,
   };
 }
@@ -49,6 +50,7 @@ test('valid development bot config parses', () => {
   assert.equal(config.botServiceRole, 'api');
   assert.equal(config.zaloUpdateMode, 'polling');
   assert.equal(config.sessionCookieName, 'lhu_admin_session');
+  assert.equal(config.trustProxy, false);
 });
 
 test('valid production bot config parses', () => {

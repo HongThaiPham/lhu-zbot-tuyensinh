@@ -22,7 +22,10 @@ enum UserStatus {
 }
 
 enum RoleName {
+  SUPER_ADMIN
   ADMIN
+  ADMISSION_EDITOR
+  VIEWER
 }
 
 model User {

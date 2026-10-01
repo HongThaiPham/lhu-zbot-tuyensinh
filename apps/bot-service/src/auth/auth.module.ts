@@ -8,11 +8,16 @@ import { SessionAuthGuard } from './session-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { LoginAbuseService } from './login-abuse.service';
 import { CsrfOriginGuard } from './csrf-origin.guard';
+import { BOT_SERVICE_CONFIG, loadAuthConfig } from './auth.config';
 
 @Module({
   imports: [PrismaModule],
   controllers: [AuthController],
   providers: [
+    {
+      provide: BOT_SERVICE_CONFIG,
+      useFactory: loadAuthConfig,
+    },
     AuthService,
     PasswordService,
     SessionService,
