@@ -25,14 +25,23 @@ cleanup() {
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+trap 'print_diag' ERR
 
 print_diag() {
-  echo "--- compose ps ---"
+  echo "--- docker compose ps ---"
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps || true
-  echo "--- bot-api logs ---"
-  docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" logs --no-color --tail=200 bot-api || true
-  echo "--- bot-worker logs ---"
-  docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" logs --no-color --tail=200 bot-worker || true
+  for service in bot-api bot-worker postgres redis; do
+    echo "--- docker compose logs --no-color ${service} ---"
+    docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" logs --no-color --tail=200 "$service" || true
+  done
+
+  for service in bot-api bot-worker postgres redis; do
+    container_id=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps -q "$service" || true)
+    if [[ -n "$container_id" ]]; then
+      echo "--- docker inspect ${service} ---"
+      docker inspect "$container_id" || true
+    fi
+  done
 }
 
 wait_for_healthy() {
