@@ -90,8 +90,12 @@ export class ZaloPollingWorker implements OnApplicationBootstrap, OnApplicationS
             : createSafeLogPayload(error, this.config.zaloBotToken);
 
         if (!mappedError.retryable) {
+          const operatorHint =
+            mappedError.status === 'AUTHENTICATION_FAILED'
+              ? 'update ZALO_BOT_TOKEN and restart the worker'
+              : 'if a webhook is active, remove it or switch to ZALO_UPDATE_MODE=webhook';
           this.logger.error(
-            `zalo polling non-retryable error status=${mappedError.status} code=${mappedError.statusCode ?? 'n/a'}; if a webhook is active, remove it or switch to ZALO_UPDATE_MODE=webhook`,
+            `zalo polling non-retryable error status=${mappedError.status} code=${mappedError.statusCode ?? 'n/a'}; ${operatorHint}`,
           );
         } else {
           this.logger.warn(
