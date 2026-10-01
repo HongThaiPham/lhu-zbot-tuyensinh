@@ -20,6 +20,11 @@ export BOT_API_PORT="${BOT_API_PORT:-$(pick_free_port)}"
 export POSTGRES_PORT="${POSTGRES_PORT:-$(pick_free_port)}"
 export REDIS_PORT="${REDIS_PORT:-$(pick_free_port)}"
 
+POSTGRES_DB_NAME="${POSTGRES_DB:-lhu_zbot}"
+POSTGRES_USERNAME="${POSTGRES_USER:-postgres}"
+POSTGRES_PASSWORD_VALUE="${POSTGRES_PASSWORD:-postgres}"
+DB_VERIFY_URL="postgresql://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD_VALUE}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB_NAME}?schema=public"
+
 cleanup() {
   echo "Cleaning up Compose project ${PROJECT_NAME}"
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -76,6 +81,26 @@ wait_for_http_status() {
     fi
     if (( SECONDS >= deadline )); then
       echo "Timed out waiting for ${url} to return ${expected}; got ${status:-unknown}" >&2
+      print_diag
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
+wait_for_http_non_2xx() {
+  local url="$1"
+  local timeout_seconds="$2"
+  local deadline=$((SECONDS + timeout_seconds))
+
+  while true; do
+    status=$(curl --connect-timeout 2 --max-time 5 -sS -o /tmp/phase0-smoke-body.txt -w '%{http_code}' "$url" || true)
+    if [[ ! "$status" =~ ^2 ]]; then
+      return 0
+    fi
+
+    if (( SECONDS >= deadline )); then
+      echo "Timed out waiting for ${url} to become non-2xx; got ${status:-unknown}" >&2
       print_diag
       exit 1
     fi
@@ -149,6 +174,12 @@ docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up --build -d
 
 wait_for_healthy postgres 120
 wait_for_healthy redis 120
+
+pnpm db:prisma:generate
+DATABASE_URL="$DB_VERIFY_URL" pnpm db:migrate:deploy
+DATABASE_URL="$DB_VERIFY_URL" pnpm db:seed
+DATABASE_URL="$DB_VERIFY_URL" pnpm db:verify
+
 wait_for_http_success "${API_BASE_URL}/health/live" 120
 wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
 wait_for_http_success "${ADMIN_BASE_URL}/health" 120
@@ -213,14 +244,23 @@ else
   exit 1
 fi
 
-docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" stop redis >/dev/null
-sleep 5
-status=$(curl -sS -o /tmp/phase0-readiness-fail.txt -w '%{http_code}' "${API_BASE_URL}/health/ready" || true)
-if [[ "$status" =~ ^2 ]]; then
-  echo "Readiness unexpectedly succeeded while Redis was stopped" >&2
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" stop postgres >/dev/null
+wait_for_http_non_2xx "${API_BASE_URL}/health/ready" 120
+
+if curl -fsS "${API_BASE_URL}/health/live" >/dev/null 2>&1; then
+  :
+else
+  echo "bot-api live endpoint should remain available while PostgreSQL is down" >&2
   print_diag
   exit 1
 fi
+
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d postgres >/dev/null
+wait_for_healthy postgres 120
+wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
+
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" stop redis >/dev/null
+wait_for_http_non_2xx "${API_BASE_URL}/health/ready" 120
 
 if curl -fsS "${API_BASE_URL}/health/live" >/dev/null 2>&1; then
   :

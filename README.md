@@ -20,12 +20,16 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-## Phase 1 status
+## Database foundation (Phase 2)
 
-This branch extends the monorepo foundation with typed configuration validation and fail-fast startup checks.
+- Canonical database package: `packages/database`
+- Prisma schema/migrations: committed and reproducible
+- pgvector extension: enabled through migration history
+- Deterministic seed + verification scripts:
+  - `pnpm db:prisma:generate`
+  - `pnpm db:migrate:deploy`
+  - `pnpm db:seed`
+  - `pnpm db:verify`
+  - `pnpm db:verify:fresh`
 
-### Phase 0 verification distinction
-
-- Unit/behavioral tests: not implemented yet in Phase 0.
-- Runtime Compose smoke verification: implemented and required in CI via `scripts/phase-0-compose-smoke.sh`.
-- The package-level `test` scripts currently only confirm the Phase 0 bootstrap state; they do not provide behavioral coverage.
+See `docs/DATABASE.md` for the full migration, seeding, health, and CI workflow.

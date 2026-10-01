@@ -1,10 +1,20 @@
 import * as net from 'node:net';
 import { NestFactory } from '@nestjs/core';
+import { DatabaseHealthProbe, PrismaClientManager } from '@lhu/database';
 import { loadBotServiceConfig } from '@lhu/config';
 import { AppModule } from './app.module';
 
 const config = loadBotServiceConfig(process.env);
 const ROLE = config.botServiceRole;
+
+const databaseClientManager = new PrismaClientManager();
+const databaseHealthProbe = new DatabaseHealthProbe(databaseClientManager.client);
+
+interface RedisDependencyState {
+  readonly host?: string;
+  readonly port?: number;
+  readonly ready: boolean;
+}
 
 function parseSocketTarget(rawValue: string | undefined, fallbackPort: number) {
   if (!rawValue) {
@@ -45,33 +55,41 @@ async function probeTcp(host: string, port: number, timeoutMs = 1500): Promise<b
   });
 }
 
-async function getReadinessState() {
-  const dbTarget = parseSocketTarget(config.databaseUrl, 5432);
+async function getRedisState(): Promise<RedisDependencyState> {
   const redisTarget = parseSocketTarget(config.redisUrl, 6379);
-
-  if (!dbTarget || !redisTarget) {
-    return {
-      ready: false,
-      dependencies: {
-        postgres: dbTarget ? { host: dbTarget.host, port: dbTarget.port, ready: false } : { ready: false },
-        redis: redisTarget ? { host: redisTarget.host, port: redisTarget.port, ready: false } : { ready: false },
-      },
-    };
+  if (!redisTarget) {
+    return { ready: false };
   }
 
-  const dbReady = await probeTcp(dbTarget.host, dbTarget.port);
-  const redisReady = await probeTcp(redisTarget.host, redisTarget.port);
+  const ready = await probeTcp(redisTarget.host, redisTarget.port);
+  return {
+    host: redisTarget.host,
+    port: redisTarget.port,
+    ready,
+  };
+}
+
+async function getReadinessState() {
+  const database = await databaseHealthProbe.checkReadiness();
+  const redis = await getRedisState();
 
   return {
-    ready: dbReady && redisReady,
+    ready: database.ready && redis.ready,
     dependencies: {
-      postgres: { host: dbTarget.host, port: dbTarget.port, ready: dbReady },
-      redis: { host: redisTarget.host, port: redisTarget.port, ready: redisReady },
+      postgres: {
+        ready: database.ready,
+        connectionReady: database.details.connectionReady,
+        schemaReady: database.details.schemaReady,
+        reason: database.details.reason,
+      },
+      redis,
     },
   };
 }
 
 async function bootstrap() {
+  await databaseClientManager.connect();
+
   if (ROLE === 'worker') {
     const app = await NestFactory.createApplicationContext(AppModule, {
       logger: false,
@@ -80,6 +98,7 @@ async function bootstrap() {
     const shutdown = async (signal: string) => {
       console.log(`[worker] received ${signal}, shutting down`);
       await app.close();
+      await databaseClientManager.disconnect();
       process.exit(0);
     };
 
@@ -127,10 +146,25 @@ async function bootstrap() {
     });
   });
 
+  const shutdown = async (signal: string) => {
+    console.log(`[api] received ${signal}, shutting down`);
+    await app.close();
+    await databaseClientManager.disconnect();
+    process.exit(0);
+  };
+
+  process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+  process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
+
   await app.listen(config.port);
 }
 
-bootstrap().catch((error) => {
+bootstrap().catch(async (error) => {
   console.error('Bot service bootstrap failed', error);
+  await databaseClientManager.disconnect();
   process.exit(1);
 });

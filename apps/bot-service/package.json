@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "pnpm --filter @lhu/config build && nest build",
+    "build": "pnpm --filter @lhu/config build && pnpm --filter @lhu/database build && nest build",
     "start": "node dist/main",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@lhu/config": "workspace:*",
+    "@lhu/database": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
