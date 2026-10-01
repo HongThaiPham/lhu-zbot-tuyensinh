@@ -1,16 +1,16 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 const FOUNDATION_SEED_KEY = 'phase2.foundation.seed';
 
 async function ensureSelectOne() {
-  await prisma.$queryRawUnsafe('SELECT 1');
+  await prisma.$queryRaw(Prisma.sql`SELECT 1`);
 }
 
 async function ensureVectorExtension() {
-  const rows = await prisma.$queryRawUnsafe(
-    "SELECT extname FROM pg_extension WHERE extname = 'vector' LIMIT 1",
+  const rows = await prisma.$queryRaw(
+    Prisma.sql`SELECT extname FROM pg_extension WHERE extname = 'vector' LIMIT 1`,
   );
 
   if (!Array.isArray(rows) || rows.length !== 1) {
@@ -19,8 +19,8 @@ async function ensureVectorExtension() {
 }
 
 async function ensureSchemaExists() {
-  const rows = await prisma.$queryRawUnsafe(
-    "SELECT to_regclass('public.system_metadata')::text AS table_name",
+  const rows = await prisma.$queryRaw(
+    Prisma.sql`SELECT to_regclass('public.system_metadata')::text AS table_name`,
   );
 
   if (!Array.isArray(rows) || rows[0]?.table_name !== 'system_metadata') {
@@ -29,14 +29,13 @@ async function ensureSchemaExists() {
 }
 
 async function ensureSeedExists() {
-  const rows = await prisma.$queryRawUnsafe(
-    `
+  const rows = await prisma.$queryRaw(
+    Prisma.sql`
       SELECT value
       FROM system_metadata
-      WHERE key = $1
+      WHERE key = ${FOUNDATION_SEED_KEY}
       LIMIT 1
     `,
-    FOUNDATION_SEED_KEY,
   );
 
   if (!Array.isArray(rows) || rows.length !== 1) {

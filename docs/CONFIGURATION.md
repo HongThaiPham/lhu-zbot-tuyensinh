@@ -27,6 +27,13 @@
 - `ZALO_UPDATE_MODE` (`polling | webhook`) — required
 - `PORT` (TCP port 1-65535) — optional, defaults to `3001`
 - `APP_ENCRYPTION_KEY` — required in production
+- `SESSION_COOKIE_NAME` — cookie name for opaque admin session (default: `lhu_admin_session`)
+- `SESSION_TTL_SECONDS` — bounded session lifetime in seconds (default: `28800`)
+- `SESSION_COOKIE_SAME_SITE` (`lax | strict`) — explicit SameSite policy for session cookie
+- `ADMIN_ORIGIN` — allowed admin browser origin for authenticated state-changing requests (default in local: `http://127.0.0.1:4100`)
+- `LOGIN_RATE_LIMIT_WINDOW_SECONDS` — login failure throttle window (default: `300`)
+- `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` — max failed attempts in window before temporary block (default: `5`)
+- `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` — only used by explicit bootstrap command
 
 ### Admin
 
@@ -35,7 +42,7 @@
 
 ## Secret classification
 
-- Secret in Phase 1: `APP_ENCRYPTION_KEY`
+- Secret in Phase 3: `APP_ENCRYPTION_KEY`, `ADMIN_BOOTSTRAP_PASSWORD`
 - Public in Phase 1: `NEXT_PUBLIC_API_BASE_URL`
 
 `APP_ENCRYPTION_KEY` must never be logged or rendered in error output. Production startup fails if it is missing, empty, placeholder/default, too short, or malformed.
@@ -54,6 +61,8 @@ On invalid configuration, startup fails immediately with a safe error format:
 - `BOT_SERVICE_ROLE: invalid value`
 
 Values are never included in error messages.
+
+Bootstrap command (`auth:bootstrap-admin`) also uses safe validation that reports variable names and reasons without secret values.
 
 ## Environment precedence
 

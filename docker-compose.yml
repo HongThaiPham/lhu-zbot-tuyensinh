@@ -39,6 +39,12 @@ services:
       REDIS_URL: redis://redis:6379
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-development-only-app-encryption-key-not-for-production}
       ZALO_UPDATE_MODE: polling
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lhu_admin_session}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+      SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
+      ADMIN_ORIGIN: ${ADMIN_ORIGIN:-http://127.0.0.1:4100}
+      LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
+      LOGIN_RATE_LIMIT_MAX_ATTEMPTS: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS:-5}
     ports:
       - "${BOT_API_PORT:-4201}:3001"
     healthcheck:
@@ -67,6 +73,12 @@ services:
       REDIS_URL: redis://redis:6379
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-development-only-app-encryption-key-not-for-production}
       ZALO_UPDATE_MODE: polling
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lhu_admin_session}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+      SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
+      ADMIN_ORIGIN: ${ADMIN_ORIGIN:-http://127.0.0.1:4100}
+      LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
+      LOGIN_RATE_LIMIT_MAX_ATTEMPTS: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS:-5}
     restart: unless-stopped
     user: "1000:1000"
 

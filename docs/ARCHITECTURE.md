@@ -15,6 +15,14 @@
 - Shared packages isolate cross-cutting code.
 - `packages/database` is the canonical database boundary for Prisma schema, migrations, seed, DB client lifecycle, and DB health probe.
 
+## Authentication and authorization (Phase 3)
+
+- Strategy: server-issued opaque session cookie with server-side session persistence in PostgreSQL.
+- Session token is random and only stored in browser HttpOnly cookie; database stores token hash only.
+- Password hashing uses Argon2id.
+- RBAC uses `users`, `roles`, and `user_roles`.
+- Audit logging uses append-oriented `audit_logs` and transactional write patterns for important mutations.
+
 ## Database readiness contract (Phase 2)
 
 - `/health/live`: process-level liveness only.

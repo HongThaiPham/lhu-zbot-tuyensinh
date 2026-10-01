@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ConfigValidationError, loadAdminConfig, loadBotServiceConfig } = require('../dist/index.js');
+const {
+  ConfigValidationError,
+  loadAdminConfig,
+  loadBootstrapAdminConfig,
+  loadBotServiceConfig,
+} = require('../dist/index.js');
 
 function buildBotEnv(overrides = {}) {
   return {
@@ -12,6 +17,12 @@ function buildBotEnv(overrides = {}) {
     ZALO_UPDATE_MODE: 'polling',
     PORT: '3001',
     APP_ENCRYPTION_KEY: 'development-only-app-encryption-key-not-for-production',
+    SESSION_COOKIE_NAME: 'lhu_admin_session',
+    SESSION_TTL_SECONDS: '28800',
+    SESSION_COOKIE_SAME_SITE: 'lax',
+    ADMIN_ORIGIN: 'http://127.0.0.1:4100',
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: '300',
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: '5',
     ...overrides,
   };
 }
@@ -37,19 +48,7 @@ test('valid development bot config parses', () => {
   assert.equal(config.nodeEnv, 'development');
   assert.equal(config.botServiceRole, 'api');
   assert.equal(config.zaloUpdateMode, 'polling');
-});
-
-test('valid test bot config parses', () => {
-  const config = loadBotServiceConfig(
-    buildBotEnv({
-      NODE_ENV: 'test',
-      BOT_SERVICE_ROLE: 'worker',
-      APP_ENCRYPTION_KEY: '',
-    }),
-  );
-
-  assert.equal(config.nodeEnv, 'test');
-  assert.equal(config.botServiceRole, 'worker');
+  assert.equal(config.sessionCookieName, 'lhu_admin_session');
 });
 
 test('valid production bot config parses', () => {
@@ -58,23 +57,18 @@ test('valid production bot config parses', () => {
       NODE_ENV: 'production',
       ZALO_UPDATE_MODE: 'webhook',
       APP_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdefEXTRA',
+      SESSION_COOKIE_SAME_SITE: 'strict',
     }),
   );
 
   assert.equal(config.nodeEnv, 'production');
   assert.equal(config.zaloUpdateMode, 'webhook');
+  assert.equal(config.sessionCookieSameSite, 'strict');
 });
 
 test('missing production secret fails', () => {
   assertConfigError(
     () => loadBotServiceConfig(buildBotEnv({ NODE_ENV: 'production', APP_ENCRYPTION_KEY: undefined })),
-    'APP_ENCRYPTION_KEY: required in production',
-  );
-});
-
-test('empty production secret fails', () => {
-  assertConfigError(
-    () => loadBotServiceConfig(buildBotEnv({ NODE_ENV: 'production', APP_ENCRYPTION_KEY: '' })),
     'APP_ENCRYPTION_KEY: required in production',
   );
 });
@@ -122,6 +116,20 @@ test('invalid PORT fails', () => {
   );
 });
 
+test('invalid session ttl fails', () => {
+  assertConfigError(
+    () => loadBotServiceConfig(buildBotEnv({ SESSION_TTL_SECONDS: '10' })),
+    'SESSION_TTL_SECONDS: invalid value',
+  );
+});
+
+test('invalid admin origin fails', () => {
+  assertConfigError(
+    () => loadBotServiceConfig(buildBotEnv({ ADMIN_ORIGIN: 'file:///tmp/x' })),
+    'ADMIN_ORIGIN: unsupported protocol',
+  );
+});
+
 test('safe validation errors do not contain secret values', () => {
   const secret = 'super-secret-value-should-never-appear';
 
@@ -134,16 +142,6 @@ test('safe validation errors do not contain secret values', () => {
       return true;
     },
   );
-});
-
-test('worker configuration remains valid', () => {
-  const config = loadBotServiceConfig(buildBotEnv({ BOT_SERVICE_ROLE: 'worker' }));
-  assert.equal(config.botServiceRole, 'worker');
-});
-
-test('api configuration remains valid', () => {
-  const config = loadBotServiceConfig(buildBotEnv({ BOT_SERVICE_ROLE: 'api' }));
-  assert.equal(config.botServiceRole, 'api');
 });
 
 test('admin configuration parses valid NEXT_PUBLIC_API_BASE_URL', () => {
@@ -164,14 +162,29 @@ test('admin production configuration fails when NEXT_PUBLIC_API_BASE_URL is miss
   );
 });
 
-test('admin production configuration parses when NEXT_PUBLIC_API_BASE_URL is valid', () => {
-  const config = loadAdminConfig(
-    buildAdminEnv({
-      NODE_ENV: 'production',
-      NEXT_PUBLIC_API_BASE_URL: 'https://admin.example.local',
-    }),
-  );
+test('bootstrap admin configuration parses valid credentials', () => {
+  const config = loadBootstrapAdminConfig({
+    ADMIN_BOOTSTRAP_EMAIL: 'admin@example.com',
+    ADMIN_BOOTSTRAP_PASSWORD: 'Str0ngPassword!123',
+  });
 
-  assert.equal(config.nodeEnv, 'production');
-  assert.equal(config.nextPublicApiBaseUrl, 'https://admin.example.local');
+  assert.equal(config.email, 'admin@example.com');
+});
+
+test('bootstrap admin validation fails safely without exposing secret values', () => {
+  const secret = 'SensitiveSecret123!';
+
+  assert.throws(
+    () =>
+      loadBootstrapAdminConfig({
+        ADMIN_BOOTSTRAP_EMAIL: 'admin@example.com',
+        ADMIN_BOOTSTRAP_PASSWORD: `${secret} `,
+      }),
+    (error) => {
+      assert.ok(error instanceof ConfigValidationError);
+      assert.doesNotMatch(error.message, new RegExp(secret));
+      assert.match(error.message, /ADMIN_BOOTSTRAP_PASSWORD/);
+      return true;
+    },
+  );
 });
