@@ -79,12 +79,19 @@ assert_status() {
   fi
 }
 
+ensure_workspace_runtime_artifacts() {
+  pnpm --filter @lhu/config build
+  pnpm --filter @lhu/database build
+}
+
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d postgres redis
 wait_for_healthy postgres 120
 wait_for_healthy redis 120
 
 POSTGRES_HOST_PORT=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port postgres 5432 | awk -F: '{print $NF}')
 DATABASE_URL_VALUE="postgresql://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD_VALUE}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB_NAME}?schema=public"
+
+ensure_workspace_runtime_artifacts
 
 pnpm db:prisma:generate
 DATABASE_URL="$DATABASE_URL_VALUE" pnpm db:migrate:deploy
