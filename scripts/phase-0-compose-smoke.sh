@@ -30,16 +30,20 @@ trap 'print_diag' ERR
 print_diag() {
   echo "--- docker compose ps ---"
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps || true
-  for service in bot-api bot-worker postgres redis; do
+  for service in admin bot-api bot-worker postgres redis; do
     echo "--- docker compose logs --no-color ${service} ---"
     docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" logs --no-color --tail=200 "$service" || true
   done
 
-  for service in bot-api bot-worker postgres redis; do
+  for service in admin bot-api bot-worker postgres redis; do
     container_id=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps -q "$service" || true)
     if [[ -n "$container_id" ]]; then
       echo "--- docker inspect ${service} ---"
       docker inspect "$container_id" || true
+      echo "--- docker inspect HostConfig.PortBindings ${service} ---"
+      docker inspect --format '{{json .HostConfig.PortBindings}}' "$container_id" || true
+      echo "--- docker inspect NetworkSettings.Ports ${service} ---"
+      docker inspect --format '{{json .NetworkSettings.Ports}}' "$container_id" || true
     fi
   done
 }
@@ -84,7 +88,11 @@ wait_for_http_success() {
   local timeout_seconds="$2"
   local deadline=$((SECONDS + timeout_seconds))
 
-  until curl --connect-timeout 2 --max-time 5 -fsS "$url" >/dev/null 2>&1; do
+  while true; do
+    if curl --connect-timeout 2 --max-time 5 -fsS "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+
     if (( SECONDS >= deadline )); then
       echo "Timed out waiting for ${url} to respond successfully" >&2
       print_diag
@@ -97,7 +105,7 @@ wait_for_http_success() {
 assert_worker_has_no_host_bindings() {
   local worker_id="$1"
   local host_bindings
-  host_bindings=$(docker inspect "$worker_id" --format '{{json .HostConfig.PortBindings}}')
+  host_bindings=$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$worker_id")
 
   if [[ "$host_bindings" == *'"3001/tcp"'* ]]; then
     echo "bot-worker unexpectedly has a host binding for 3001/tcp" >&2
@@ -125,7 +133,7 @@ wait_for_healthy postgres 120
 wait_for_healthy redis 120
 wait_for_http_success "${API_BASE_URL}/health/live" 120
 wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
-wait_for_http_status "${ADMIN_BASE_URL}/health" 200 120
+wait_for_http_success "${ADMIN_BASE_URL}/health" 120
 
 worker_id=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps -q bot-worker)
 if [[ -z "$worker_id" ]]; then
@@ -148,24 +156,48 @@ docker logs "$worker_id" 2>&1 | grep -q "worker mode" || {
 
 assert_worker_has_no_host_bindings "$worker_id"
 
-if docker inspect "$worker_id" --format '{{json .NetworkSettings.Ports}}' | grep -q '3001'; then
+if docker inspect --format '{{json .NetworkSettings.Ports}}' "$worker_id" | grep -q '"3001/tcp"'; then
   echo "bot-worker unexpectedly exposes port 3001 in container network metadata" >&2
-  docker inspect "$worker_id" --format '{{json .NetworkSettings.Ports}}' >&2 || true
+  docker inspect --format '{{json .NetworkSettings.Ports}}' "$worker_id" >&2 || true
   print_diag
   exit 1
 fi
 
-docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" stop postgres >/dev/null
+if curl -fsS "${API_BASE_URL}/health/live" >/dev/null 2>&1; then
+  :
+else
+  echo "bot-api live endpoint not available after startup" >&2
+  print_diag
+  exit 1
+fi
+
+if curl -fsS "${ADMIN_BASE_URL}/health" >/dev/null 2>&1; then
+  :
+else
+  echo "admin health endpoint not available after startup" >&2
+  print_diag
+  exit 1
+fi
+
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" stop redis >/dev/null
 sleep 5
 status=$(curl -sS -o /tmp/phase0-readiness-fail.txt -w '%{http_code}' "${API_BASE_URL}/health/ready" || true)
 if [[ "$status" =~ ^2 ]]; then
-  echo "Readiness unexpectedly succeeded while PostgreSQL was stopped" >&2
+  echo "Readiness unexpectedly succeeded while Redis was stopped" >&2
   print_diag
   exit 1
 fi
 
-docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d postgres >/dev/null
-wait_for_healthy postgres 120
+if curl -fsS "${API_BASE_URL}/health/live" >/dev/null 2>&1; then
+  :
+else
+  echo "bot-api live endpoint should remain available while Redis is down" >&2
+  print_diag
+  exit 1
+fi
+
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d redis >/dev/null
+wait_for_healthy redis 120
 wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
 
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null
