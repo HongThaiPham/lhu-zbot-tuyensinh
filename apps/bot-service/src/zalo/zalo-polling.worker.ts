@@ -70,7 +70,6 @@ export class ZaloPollingWorker implements OnApplicationBootstrap, OnApplicationS
         }
 
         this.backoffMs = ZALO_POLL_BACKOFF_MIN_MS;
-        continue;
       } catch (error) {
         if (!this.isRunning) {
           break;

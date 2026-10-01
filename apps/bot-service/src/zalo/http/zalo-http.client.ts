@@ -19,9 +19,13 @@ function mergeAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
   }
 
   const controller = new AbortController();
+  const abortListeners: Array<{ signal: AbortSignal; listener: () => void }> = [];
   const abort = () => {
     if (!controller.signal.aborted) {
       controller.abort();
+      for (const { signal, listener } of abortListeners) {
+        signal.removeEventListener('abort', listener);
+      }
     }
   };
 
@@ -31,7 +35,11 @@ function mergeAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
       break;
     }
 
-    signal.addEventListener('abort', abort, { once: true });
+    const listener = () => {
+      abort();
+    };
+    abortListeners.push({ signal, listener });
+    signal.addEventListener('abort', listener, { once: true });
   }
 
   return controller.signal;
