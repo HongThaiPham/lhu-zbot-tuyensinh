@@ -8,7 +8,10 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'No tests for config in Phase 0'"
+    "test": "pnpm build && node --test ./test/**/*.test.js"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

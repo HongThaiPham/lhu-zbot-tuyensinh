@@ -33,7 +33,9 @@ services:
       BOT_SERVICE_ROLE: api
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/lhu_zbot?schema=public}
       NODE_ENV: development
+      PORT: 3001
       REDIS_URL: redis://redis:6379
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-development-only-app-encryption-key-not-for-production}
       ZALO_UPDATE_MODE: polling
     ports:
       - "${BOT_API_PORT:-4201}:3001"
@@ -59,7 +61,9 @@ services:
       BOT_SERVICE_ROLE: worker
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/lhu_zbot?schema=public}
       NODE_ENV: development
+      PORT: 3001
       REDIS_URL: redis://redis:6379
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-development-only-app-encryption-key-not-for-production}
       ZALO_UPDATE_MODE: polling
     restart: unless-stopped
     user: "1000:1000"

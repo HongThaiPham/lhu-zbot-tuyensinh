@@ -1,8 +1,10 @@
 import * as net from 'node:net';
 import { NestFactory } from '@nestjs/core';
+import { loadBotServiceConfig } from '@lhu/config';
 import { AppModule } from './app.module';
 
-const ROLE = (process.env.BOT_SERVICE_ROLE ?? 'api').toLowerCase();
+const config = loadBotServiceConfig(process.env);
+const ROLE = config.botServiceRole;
 
 function parseSocketTarget(rawValue: string | undefined, fallbackPort: number) {
   if (!rawValue) {
@@ -44,8 +46,8 @@ async function probeTcp(host: string, port: number, timeoutMs = 1500): Promise<b
 }
 
 async function getReadinessState() {
-  const dbTarget = parseSocketTarget(process.env.DATABASE_URL, 5432);
-  const redisTarget = parseSocketTarget(process.env.REDIS_URL, 6379);
+  const dbTarget = parseSocketTarget(config.databaseUrl, 5432);
+  const redisTarget = parseSocketTarget(config.redisUrl, 6379);
 
   if (!dbTarget || !redisTarget) {
     return {
@@ -125,7 +127,7 @@ async function bootstrap() {
     });
   });
 
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3001);
+  await app.listen(config.port);
 }
 
 bootstrap().catch((error) => {

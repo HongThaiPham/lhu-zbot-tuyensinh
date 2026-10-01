@@ -10,6 +10,7 @@
     "test": "echo 'No tests for bot-service in Phase 0'"
   },
   "dependencies": {
+    "@lhu/config": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",

@@ -8,6 +8,11 @@ This repository bootstraps the LHU admissions assistant monorepo for a Next.js a
 - `apps/bot-service` – NestJS API and worker service
 - `packages/*` – shared libraries for config, database, UI, and common logic
 
+## Configuration
+
+- Canonical runtime configuration is implemented in `packages/config`.
+- See `/home/runner/work/lhu-zbot-tuyensinh/lhu-zbot-tuyensinh/docs/CONFIGURATION.md` for variable rules, startup validation, and production secret requirements.
+
 ## Local development
 
 ```bash
@@ -15,9 +20,9 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-## Phase 0 status
+## Phase 1 status
 
-This branch establishes the monorepo foundation, workspace tooling, Docker Compose runtime skeleton, and verified bootstrap checks.
+This branch extends the monorepo foundation with typed configuration validation and fail-fast startup checks.
 
 ### Phase 0 verification distinction
 
