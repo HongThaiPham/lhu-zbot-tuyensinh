@@ -3,7 +3,7 @@ import test from 'node:test';
 import type { BotServiceConfig } from '@lhu/config';
 import { ZaloAdapter } from '../src/zalo/zalo.adapter';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
-import type { ZaloSdkFactory } from '../src/zalo/sdk/zalo-sdk.types';
+import type { ZaloHttpClient } from '../src/zalo/http/zalo-http.types';
 
 function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfig {
   return {
@@ -26,18 +26,13 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
   };
 }
 
-function buildFactory(getMeImpl: () => Promise<unknown>): ZaloSdkFactory {
+function buildClient(getMeImpl: (token?: string) => Promise<unknown>): ZaloHttpClient {
   return {
-    create: () => ({
-      getMe: getMeImpl,
-    }),
+    getMe: getMeImpl,
   };
 }
 
-// Verified from node-zalo-bot@0.1.6 runtime:
-// getMe() delegates to _request('getMe', ...), and _request resolves response.data.result
-// when response.data.ok is true.
-function buildVerifiedGetMeResultFixture() {
+function buildGetMeResultFixture() {
   return {
     id: 123,
     name: 'LHU Admissions Bot',
@@ -47,19 +42,15 @@ function buildVerifiedGetMeResultFixture() {
   } as const;
 }
 
-test('factory receives validated token', async () => {
+test('http client receives validated token', async () => {
   let receivedToken = '';
   const config = buildConfig({ zaloBotToken: 'token-from-config' });
-  const factory: ZaloSdkFactory = {
-    create: (token: string) => {
-      receivedToken = token;
-      return {
-        getMe: async () => ({ id: 'bot-1' }),
-      };
-    },
-  };
+  const client = buildClient(async (token: string) => {
+    receivedToken = token;
+    return { ok: true, result: { id: 'bot-1' } };
+  });
 
-  const adapter = new ZaloAdapter(config, factory);
+  const adapter = new ZaloAdapter(config, client);
   const identity = await adapter.getIdentity();
 
   assert.equal(receivedToken, 'token-from-config');
@@ -69,7 +60,7 @@ test('factory receives validated token', async () => {
 test('successful getMe maps to internal identity dto', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => buildVerifiedGetMeResultFixture()),
+    buildClient(async () => ({ ok: true, result: buildGetMeResultFixture() })),
   );
 
   const identity = await adapter.getIdentity();
@@ -82,11 +73,14 @@ test('successful getMe maps to internal identity dto', async () => {
   });
 });
 
-test('malformed successful direct result maps to INVALID_RESPONSE', async () => {
+test('malformed successful response with missing id maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => ({
-      username: 'missing-id',
+    buildClient(async () => ({
+      ok: true,
+      result: {
+        username: 'missing-id',
+      },
     })),
   );
 
@@ -97,30 +91,25 @@ test('malformed successful direct result maps to INVALID_RESPONSE', async () => 
   });
 });
 
-test('successful envelope shape maps to internal identity dto', async () => {
+test('response without ok=true maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => ({
-      ok: true,
-      result: buildVerifiedGetMeResultFixture(),
-      leakedEnvelopeField: 'ignored',
+    buildClient(async () => ({
+      result: buildGetMeResultFixture(),
     })),
   );
 
-  const identity = await adapter.getIdentity();
-
-  assert.deepEqual(identity, {
-    id: '123',
-    displayName: 'LHU Admissions Bot',
-    username: 'lhu_bot',
-    avatar: 'https://example.com/avatar.png',
+  await assert.rejects(() => adapter.getIdentity(), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
   });
 });
 
 test('malformed envelope with missing result maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => ({
+    buildClient(async () => ({
       ok: true,
     })),
   );
@@ -135,7 +124,7 @@ test('malformed envelope with missing result maps to INVALID_RESPONSE', async ()
 test('envelope with missing bot id maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => ({
+    buildClient(async () => ({
       ok: true,
       result: {
         username: 'missing-id',
@@ -153,7 +142,7 @@ test('envelope with missing bot id maps to INVALID_RESPONSE', async () => {
 test('unexpected ok=false envelope maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => ({
+    buildClient(async () => ({
       ok: false,
       error_code: 401,
       description: 'invalid token',
@@ -170,9 +159,9 @@ test('unexpected ok=false envelope maps to INVALID_RESPONSE', async () => {
 test('raw upstream envelope fields do not leak beyond normalized identity', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildFactory(async () => ({
+    buildClient(async () => ({
       ok: true,
-      result: buildVerifiedGetMeResultFixture(),
+      result: buildGetMeResultFixture(),
       request_id: 'upstream-request-id',
     })),
   );
@@ -188,9 +177,9 @@ test('missing token fails safely without sdk call', async () => {
   let called = false;
   const adapter = new ZaloAdapter(
     buildConfig({ zaloBotToken: '' }),
-    buildFactory(async () => {
+    buildClient(async () => {
       called = true;
-      return { id: 'bot-1' };
+      return { ok: true, result: { id: 'bot-1' } };
     }),
   );
 

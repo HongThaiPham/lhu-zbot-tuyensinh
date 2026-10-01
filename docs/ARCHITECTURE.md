@@ -14,12 +14,12 @@
 - Bot service owns Zalo, AI, queueing, crawler, and admissions logic.
 - Shared packages isolate cross-cutting code.
 - `packages/database` is the canonical database boundary for Prisma schema, migrations, seed, DB client lifecycle, and DB health probe.
-- `apps/bot-service/src/zalo` is the canonical Zalo SDK boundary; only this module imports `node-zalo-bot`.
+- `apps/bot-service/src/zalo` is the canonical Zalo boundary; only this module calls the official Zalo Bot REST API transport.
 
-## Zalo SDK integration foundation (Phase 4)
+## Zalo API integration foundation (Phase 4)
 
-- Canonical SDK construction path:
-  - `NodeZaloSdkFactory` -> `ZaloAdapter` -> `ZaloService`
+- Canonical transport path:
+  - `OfficialZaloHttpClient` -> `ZaloAdapter` -> `ZaloService`
 - Admin test endpoint:
   - `POST /admin/zalo/test-connection`
   - session auth + ADMIN RBAC + CSRF/origin guard

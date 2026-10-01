@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSafeLogPayload, mapSdkError, sanitizeZaloUrl } from '../src/zalo/zalo.errors';
+import {
+  ZaloApiRequestError,
+  createSafeLogPayload,
+  mapHttpError,
+  sanitizeZaloUrl,
+} from '../src/zalo/zalo.errors';
 
 test('token-bearing zalo url is redacted', () => {
   const token = 'abc-super-secret-token';
@@ -12,7 +17,7 @@ test('token-bearing zalo url is redacted', () => {
 });
 
 test('authentication failures map to AUTHENTICATION_FAILED', () => {
-  const mapped = mapSdkError({
+  const mapped = mapHttpError({
     response: {
       status: 401,
       data: {
@@ -26,7 +31,7 @@ test('authentication failures map to AUTHENTICATION_FAILED', () => {
 });
 
 test('rate limit failures map to RATE_LIMITED', () => {
-  const mapped = mapSdkError({
+  const mapped = mapHttpError({
     response: {
       status: 429,
       data: {
@@ -44,10 +49,22 @@ test('rate limit failures map to RATE_LIMITED', () => {
 });
 
 test('network failures map to NETWORK_ERROR', () => {
-  const mapped = mapSdkError({
+  const mapped = mapHttpError({
     code: 'ECONNREFUSED',
     message: 'connect ECONNREFUSED',
   });
+
+  assert.equal(mapped.status, 'NETWORK_ERROR');
+  assert.equal(mapped.retryable, true);
+});
+
+test('client timeout failures map to NETWORK_ERROR', () => {
+  const mapped = mapHttpError(
+    new ZaloApiRequestError('timeout', {
+      category: 'timeout',
+      requestUrl: 'https://bot-api.zapps.me/bot[REDACTED]/getMe',
+    }),
+  );
 
   assert.equal(mapped.status, 'NETWORK_ERROR');
   assert.equal(mapped.retryable, true);

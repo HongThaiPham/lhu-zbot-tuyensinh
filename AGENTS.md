@@ -10,7 +10,7 @@ Priority: security/correctness -> current official Zalo Bot docs -> this file ->
 
 Zalo source of truth: `https://docs.zaloplatforms.com/docs/BOT`.
 
-Before implementing Zalo functionality, read the relevant current official docs and inspect the installed `node-zalo-bot` API/types. Never invent endpoints, webhook headers/signatures, update fields, event types, SDK methods, message limits, polling/webhook semantics or retry behavior. Zalo Bot Platform must not be confused with Zalo OA/Open API or ZNS.
+Before implementing Zalo functionality, read the relevant current official docs and verify the official Zalo Bot REST API documentation and response contracts. Never invent endpoints, webhook headers/signatures, update fields, event types, message limits, polling/webhook semantics or retry behavior. Zalo Bot Platform must not be confused with Zalo OA/Open API or ZNS.
 
 LHU admissions source of truth: `https://tuyensinh.lhu.edu.vn/`. Critical admissions facts must come from official/versioned knowledge or approved structured data, not LLM memory.
 
@@ -21,7 +21,7 @@ Use pnpm workspaces + Turborepo:
 ```text
 apps/
   admin/          # Next.js
-  bot-service/    # NestJS + node-zalo-bot
+  bot-service/    # NestJS + Zalo REST API adapter
 packages/
   database/
   shared/
@@ -39,18 +39,18 @@ Use PostgreSQL + Prisma + pgvector, Redis + BullMQ, Docker, GitHub Actions and G
 
 ## 3. Infrastructure boundaries
 
-Infrastructure libraries are adapters. Domain/application logic MUST NOT directly depend on `node-zalo-bot`, Prisma Client, provider SDK clients or BullMQ job objects.
+Infrastructure libraries are adapters. Domain/application logic MUST NOT directly depend on third-party Zalo SDKs, Prisma Client, provider SDK clients or BullMQ job objects.
 
 ```text
-node-zalo-bot -> ZaloSdkClient -> ZaloMessageSender -> Application
+Zalo REST API -> ZaloHttpClient -> ZaloAdapter -> Application
 OpenAI-compatible API -> OpenAICompatibleProvider -> ChatModelProvider -> AIOrchestrator
 ```
 
-Only the Zalo module may directly import `node-zalo-bot`. Zalo DTOs must not leak into Admissions, RAG, Knowledge, AI or Conversation core logic.
+Only the Zalo module may call the official Zalo REST API transport. Zalo DTOs must not leak into Admissions, RAG, Knowledge, AI or Conversation core logic.
 
 ## 4. Zalo rules
 
-Use `node-zalo-bot` for supported Bot Platform operations. If the current official API documents a capability not supported by the SDK, any direct HTTP implementation must be isolated in the Zalo infrastructure adapter, tested and documented in `docs/ZALO.md`.
+Use the official Zalo Bot REST API through the Zalo infrastructure adapter. Do not add third-party Zalo SDK dependencies.
 
 Support mutually exclusive modes:
 

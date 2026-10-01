@@ -1,6 +1,6 @@
 import { loadBotServiceConfig } from '@lhu/config';
 import { ZaloAdapter } from '../zalo/zalo.adapter';
-import { NodeZaloSdkFactory } from '../zalo/sdk/zalo-sdk.factory';
+import { OfficialZaloHttpClient } from '../zalo/http/zalo-http.client';
 import { ZaloService } from '../zalo/zalo.service';
 
 async function main(): Promise<void> {
@@ -9,7 +9,7 @@ async function main(): Promise<void> {
     throw new Error('ZALO_BOT_TOKEN is required for manual test connection');
   }
 
-  const adapter = new ZaloAdapter(config, new NodeZaloSdkFactory());
+  const adapter = new ZaloAdapter(config, new OfficialZaloHttpClient());
   const service = new ZaloService(adapter);
   const result = await service.testConnection();
 

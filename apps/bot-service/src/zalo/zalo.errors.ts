@@ -1,5 +1,12 @@
 import type { ZaloConnectionFailureResult } from './zalo.types';
 
+type ZaloRequestErrorCategory =
+  | 'api_error'
+  | 'http_error'
+  | 'network_error'
+  | 'timeout'
+  | 'invalid_response';
+
 export class ZaloIntegrationError extends Error {
   public readonly status: ZaloConnectionFailureResult['status'];
   public readonly retryable: boolean;
@@ -18,6 +25,33 @@ export class ZaloIntegrationError extends Error {
     this.statusCode = input.statusCode;
     this.upstreamCode = input.upstreamCode;
     this.retryAfterSeconds = input.retryAfterSeconds;
+  }
+}
+
+export class ZaloApiRequestError extends Error {
+  public readonly category: ZaloRequestErrorCategory;
+  public readonly statusCode?: number;
+  public readonly upstreamCode?: string | number;
+  public readonly retryAfterSeconds?: number;
+  public readonly requestUrl?: string;
+
+  public constructor(
+    message: string,
+    input: {
+      readonly category: ZaloRequestErrorCategory;
+      readonly statusCode?: number;
+      readonly upstreamCode?: string | number;
+      readonly retryAfterSeconds?: number;
+      readonly requestUrl?: string;
+    },
+  ) {
+    super(message);
+    this.name = 'ZaloApiRequestError';
+    this.category = input.category;
+    this.statusCode = input.statusCode;
+    this.upstreamCode = input.upstreamCode;
+    this.retryAfterSeconds = input.retryAfterSeconds;
+    this.requestUrl = input.requestUrl;
   }
 }
 
@@ -109,7 +143,55 @@ function isNetworkError(input: unknown): boolean {
   return record?.response == null;
 }
 
-export function mapSdkError(error: unknown): ZaloIntegrationError {
+export function mapHttpError(error: unknown): ZaloIntegrationError {
+  if (error instanceof ZaloApiRequestError) {
+    if (error.category === 'timeout' || error.category === 'network_error') {
+      return new ZaloIntegrationError('Zalo network failure', {
+        status: 'NETWORK_ERROR',
+        retryable: true,
+        statusCode: error.statusCode,
+        upstreamCode: error.upstreamCode,
+        retryAfterSeconds: error.retryAfterSeconds,
+      });
+    }
+
+    if (error.category === 'invalid_response') {
+      return new ZaloIntegrationError('Zalo returned invalid response', {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+        statusCode: error.statusCode,
+        retryAfterSeconds: error.retryAfterSeconds,
+      });
+    }
+
+    if (error.statusCode === 401 || error.statusCode === 403) {
+      return new ZaloIntegrationError('Zalo authentication failed', {
+        status: 'AUTHENTICATION_FAILED',
+        retryable: false,
+        statusCode: error.statusCode,
+        upstreamCode: error.upstreamCode,
+      });
+    }
+
+    if (error.statusCode === 429 || error.upstreamCode === 429) {
+      return new ZaloIntegrationError('Zalo rate limit encountered', {
+        status: 'RATE_LIMITED',
+        retryable: true,
+        statusCode: error.statusCode ?? 429,
+        upstreamCode: error.upstreamCode,
+        retryAfterSeconds: error.retryAfterSeconds,
+      });
+    }
+
+    return new ZaloIntegrationError('Zalo upstream failure', {
+      status: 'UPSTREAM_ERROR',
+      retryable: error.statusCode === undefined || error.statusCode >= 500,
+      statusCode: error.statusCode,
+      upstreamCode: error.upstreamCode,
+      retryAfterSeconds: error.retryAfterSeconds,
+    });
+  }
+
   const statusCode = extractStatusCode(error);
   const upstreamCode = extractUpstreamCode(error);
   const retryAfterSeconds = extractRetryAfterSeconds(error);
@@ -164,6 +246,17 @@ export function toFailureResult(error: ZaloIntegrationError): ZaloConnectionFail
 }
 
 export function createSafeLogPayload(error: unknown, token: string): Readonly<Record<string, unknown>> {
+  if (error instanceof ZaloApiRequestError) {
+    return Object.freeze({
+      category: error.category,
+      code: undefined,
+      statusCode: error.statusCode,
+      upstreamCode: error.upstreamCode,
+      retryAfterSeconds: error.retryAfterSeconds,
+      requestUrl: typeof error.requestUrl === 'string' ? sanitizeZaloUrl(error.requestUrl, token) : undefined,
+    });
+  }
+
   const record = extractObjectRecord(error);
   const config = extractObjectRecord(record?.config);
   const requestUrl = typeof config?.url === 'string' ? sanitizeZaloUrl(config.url, token) : undefined;

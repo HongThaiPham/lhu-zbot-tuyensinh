@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { loadBotServiceConfig } from '@lhu/config';
-import { ZALO_CONFIG, ZALO_SDK_FACTORY } from './zalo.constants';
+import { ZALO_CONFIG, ZALO_HTTP_CLIENT } from './zalo.constants';
 import { ZaloAdapter } from './zalo.adapter';
 import { ZaloService } from './zalo.service';
-import { NodeZaloSdkFactory } from './sdk/zalo-sdk.factory';
+import { OfficialZaloHttpClient } from './http/zalo-http.client';
 
 @Module({
   providers: [
@@ -12,8 +12,8 @@ import { NodeZaloSdkFactory } from './sdk/zalo-sdk.factory';
       useFactory: () => loadBotServiceConfig(process.env),
     },
     {
-      provide: ZALO_SDK_FACTORY,
-      useClass: NodeZaloSdkFactory,
+      provide: ZALO_HTTP_CLIENT,
+      useClass: OfficialZaloHttpClient,
     },
     ZaloAdapter,
     ZaloService,

@@ -245,8 +245,8 @@ jobs:
       - name: Authentication foundation verification
         run: ./scripts/phase-3-auth-foundation.sh
 
-  zalo-sdk-foundation:
-    name: Zalo SDK Foundation
+  zalo-api-foundation:
+    name: Zalo API Foundation
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -265,5 +265,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Zalo SDK foundation verification
-        run: ./scripts/phase-4-zalo-sdk-foundation.sh
+      - name: Zalo API foundation verification
+        run: ./scripts/phase-4-zalo-api-foundation.sh

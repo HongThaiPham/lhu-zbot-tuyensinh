@@ -2,66 +2,65 @@
 
 ## References consulted
 
-- Official Zalo Bot docs target: `https://docs.zaloplatforms.com/docs/BOT` (still DNS-unreachable from this CI/sandbox runtime at verification time, so runtime contract verification relies on installed SDK source/runtime inspection rather than guessing).
-- Installed SDK package: `node-zalo-bot@0.1.6`.
-
-## SDK surface used in Phase 4
-
-Phase 4 uses only:
-
-- constructor: `new ZaloBot(token, { polling: false })`
-- method: `getMe()`
-
-Contract tests also verify presence of `getUpdates`, `sendMessage`, and `setWebHook` so CI catches API drift affecting planned next phases.
+- Official Zalo Bot docs targets:
+  - `https://docs.zaloplatforms.com/docs/BOT/call_api`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/getMe`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/getUpdates`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/setWebhook`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/testWebhook`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/deleteWebhook`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/getWebhookInfo`
+  - `https://docs.zaloplatforms.com/docs/BOT/webhook`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendMessage`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendPhoto`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendSticker`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendChatAction`
+  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendVoice`
+- Note: these endpoints were DNS-unreachable from this sandbox runtime during verification, so implementation remains constrained to documented Phase 4 behavior and mocked transport tests.
 
 ## Architecture boundary
 
-`apps/bot-service/src/zalo` is the only module that imports `node-zalo-bot`.
+Phase 4 permanently uses direct official REST integration (no third-party SDK):
 
-Flow:
+`AdminZaloController -> AdminZaloService -> ZaloService -> ZaloAdapter -> OfficialZaloHttpClient -> Zalo Bot REST API`
 
-`AdminZaloController -> AdminZaloService -> ZaloService -> ZaloAdapter -> NodeZaloSdkFactory -> node-zalo-bot -> Zalo API`
+`apps/bot-service/src/zalo` is the only module that owns this external transport boundary.
 
-No non-Zalo module instantiates SDK objects directly.
+## Third-party SDK policy
+
+- `node-zalo-bot`: removed
+- Third-party Zalo SDK dependencies: none
 
 ## Configuration
 
-- `ZALO_BOT_TOKEN` added to typed config.
-- Production validation:
-  - required (`ZALO_BOT_TOKEN: required in production`)
-  - placeholder/default values rejected
-- Value is never included in validation errors.
-- Dev/test can omit token for deterministic tests with fakes/mocks.
+- `ZALO_BOT_TOKEN` is required in production and optional in development/test.
+- Token values are never returned in API payloads, logs, or config validation messages.
+- `ZALO_UPDATE_MODE` stays unchanged (`polling`/`webhook`) for future phases.
 
-## getMe identity mapping
+## HTTP transport contract (Phase 4)
 
-### Verified `getMe` runtime contract (`node-zalo-bot@0.1.6`)
+- Base URL: `https://bot-api.zapps.me`
+- Tokenized endpoint pattern: `/bot{token}/{method}`
+- Implemented method in Phase 4: `getMe` only
+- Request timeout: 5 seconds
+- Response expectation for `getMe`: JSON envelope with `ok` boolean and `result` object
+- Unsuccessful envelope (`ok !== true`) is normalized to safe error categories without leaking token
 
-From installed package runtime/source:
+## getMe identity normalization
 
-- `getMe()` delegates to `_request('getMe', { form: options })`
-- `_request(...)` resolves **`response.data.result`** when `response.data.ok === true`
-- `_request(...)` throws `ZaloError` when `response.data.ok !== true`
+`ZaloAdapter` maps `result` to internal `ZaloBotIdentity`:
 
-Evidence:
+- required: `id` (`string | number`, normalized to string)
+- optional:
+  - `name` -> `displayName`
+  - `username`
+  - `avatar`
 
-- `node_modules/.pnpm/node-zalo-bot@0.1.6_request@2.88.2/node_modules/node-zalo-bot/src/zalo.js` (runtime source)
-- Runtime introspection via `ZaloBot.prototype.getMe.toString()` and `ZaloBot.prototype._request.toString()`
-
-Therefore, the adapter treats the direct resolved object as the primary contract, and only supports envelope-shaped payloads defensively (mapping malformed/unsuccessful envelopes to `INVALID_RESPONSE`).
-
-### Internal normalization
-
-The adapter normalizes verified `getMe` result into internal `ZaloBotIdentity`:
-
-- required: `id` (stringified)
-- optional (if present): `name -> displayName`, `username`, `avatar`
-
-Malformed payloads and malformed/unsuccessful envelopes map to `INVALID_RESPONSE`.
+Invalid/malformed envelope or identity payload maps to `INVALID_RESPONSE`.
 
 ## Connection test behavior
 
-Connection testing performs one bounded `getMe` attempt (no polling/webhook startup). Result categories:
+Connection testing performs one bounded `getMe` request and returns:
 
 - `CONNECTED`
 - `AUTHENTICATION_FAILED`
@@ -70,32 +69,25 @@ Connection testing performs one bounded `getMe` attempt (no polling/webhook star
 - `UPSTREAM_ERROR`
 - `INVALID_RESPONSE`
 
-No aggressive retries are added in Phase 4.
+No polling loop or webhook processing is implemented in Phase 4.
 
-## Error normalization and redaction
+## Error handling and redaction
 
-- Upstream SDK/API errors are mapped to internal safe categories.
-- Safe metadata may include status code, upstream code, retryability, `Retry-After`.
-- Token-bearing URLs are sanitized (e.g. `/bot<token>/...` -> `/bot[REDACTED]/...`).
-- Token values are never logged or returned.
+- HTTP/network/timeout/API-envelope failures map to normalized safe error categories.
+- Safe metadata includes only non-secret fields (status code, upstream code, retry-after, sanitized request URL).
+- Token-bearing URLs are always redacted (`/bot<token>/...` -> `/bot[REDACTED]/...`).
 
 ## Admin endpoint
 
 - `POST /admin/zalo/test-connection`
-- Guarded by session auth + ADMIN role + existing CSRF/origin policy.
-- Returns normalized safe result only.
-- Action is audited (`ADMIN_ZALO_TEST_CONNECTION`) without secret fields.
+- Protected by session auth + ADMIN RBAC + CSRF/origin guard
+- Audited as `ADMIN_ZALO_TEST_CONNECTION`
+- Returns normalized safe result only
 
-## Timeout and retry
+## Runtime health boundary
 
-- Adapter-level timeout: 5s for `getMe`.
-- Authentication failures are not retried.
-- Phase 4 keeps a single-attempt test flow.
-
-## Runtime health
-
-- `/health/live` and `/health/ready` do not call Zalo externally.
-- Zalo check is explicit (`/admin/zalo/test-connection`) rather than readiness-coupled.
+- `/health/live` and `/health/ready` do not perform live Zalo API calls.
+- Zalo external connectivity is tested explicitly via admin endpoint or optional script.
 
 ## Manual live test command
 
@@ -103,16 +95,12 @@ No aggressive retries are added in Phase 4.
 pnpm zalo:test-connection
 ```
 
-Requires `ZALO_BOT_TOKEN`. Prints safe status/identity only, exits non-zero on failure.
+Requires `ZALO_BOT_TOKEN`; outputs only normalized safe result.
 
-## Known SDK limitations observed
+## Planned APIs by later phases
 
-- Package ships no TypeScript declarations; local declaration file is maintained for the Phase 4 contract used by this repository.
-- Package source is distributed as obfuscated JavaScript, so contract tests are kept to detect API drift on upgrades.
+- Phase 5 plan: `getUpdates` polling flow
+- Phase 6 plan: `setWebhook`, `testWebhook`, `deleteWebhook`, `getWebhookInfo`, webhook receiver
+- Phase 7 plan: `sendMessage`, `sendPhoto`, `sendSticker`, `sendChatAction`, `sendVoice`
 
-## Upgrade procedure
-
-1. Upgrade `node-zalo-bot` version.
-2. Run SDK contract test and full CI.
-3. Re-check constructor/getMe compatibility and error mapping behavior.
-4. Update this document with new verified version/surface.
+These are documented targets only in this phase; not implemented here.

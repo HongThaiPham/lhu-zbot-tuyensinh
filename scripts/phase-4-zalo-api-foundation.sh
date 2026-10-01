@@ -20,4 +20,4 @@ corepack pnpm --filter @lhu/config test
 corepack pnpm --filter @lhu/bot-service build
 corepack pnpm --filter @lhu/bot-service test
 
-echo "Phase 4 Zalo SDK foundation verification passed"
+echo "Phase 4 Zalo API foundation verification passed"

@@ -3,10 +3,10 @@ import test from 'node:test';
 import { ZaloService } from '../src/zalo/zalo.service';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
 
-test('raw sdk response does not leak outside zalo service boundary', async () => {
+test('raw transport response does not leak outside zalo service boundary', async () => {
   const rawResponse = {
     id: 'bot-1',
-    transport: 'sdk-internal',
+    transport: 'http-internal',
     access_token: 'must-not-leak',
   };
 
