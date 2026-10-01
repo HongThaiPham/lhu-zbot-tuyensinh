@@ -1,0 +1,93 @@
+services:
+  admin:
+    build:
+      context: .
+      dockerfile: ./apps/admin/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?must set NEXT_PUBLIC_API_BASE_URL}
+      NODE_ENV: production
+    depends_on:
+      bot-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+    user: "1000:1000"
+
+  bot-api:
+    build:
+      context: .
+      dockerfile: ./apps/bot-service/Dockerfile
+    environment:
+      BOT_SERVICE_ROLE: api
+      DATABASE_URL: ${DATABASE_URL:?must set DATABASE_URL}
+      NODE_ENV: production
+      REDIS_URL: ${REDIS_URL:?must set REDIS_URL}
+      ZALO_UPDATE_MODE: webhook
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3001/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+    user: "1000:1000"
+
+  bot-worker:
+    build:
+      context: .
+      dockerfile: ./apps/bot-service/Dockerfile
+    environment:
+      BOT_SERVICE_ROLE: worker
+      DATABASE_URL: ${DATABASE_URL:?must set DATABASE_URL}
+      NODE_ENV: production
+      REDIS_URL: ${REDIS_URL:?must set REDIS_URL}
+      ZALO_UPDATE_MODE: webhook
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    user: "1000:1000"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lhu_zbot}
+      POSTGRES_USER: ${POSTGRES_USER:?must set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-lhu_zbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

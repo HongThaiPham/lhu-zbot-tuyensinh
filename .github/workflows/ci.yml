@@ -32,10 +32,6 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
-
-          # Phase identity is authoritative from the PR title. GitHub Copilot Cloud
-          # Agent owns its working branch name (normally copilot/*), so phase work
-          # must never require the agent to create/push a custom phase/* branch.
           if [[ "$PR_TITLE" =~ ^Phase\ ([0-9]+):\ .+ ]]; then
             PHASE=$((10#${BASH_REMATCH[1]}))
             if [[ "$PHASE" -lt 0 || "$PHASE" -gt 25 ]]; then
@@ -149,3 +145,26 @@ jobs:
         shell: bash
         run: |
           echo "Dependency Review PASS (bootstrap state: no dependency manifests yet)."
+
+  runtime-smoke:
+    name: Runtime Smoke
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Runtime smoke test
+        run: ./scripts/phase-0-compose-smoke.sh
