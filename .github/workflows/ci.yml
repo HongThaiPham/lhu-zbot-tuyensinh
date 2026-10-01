@@ -267,3 +267,41 @@ jobs:
 
       - name: Zalo API foundation verification
         run: ./scripts/phase-4-zalo-api-foundation.sh
+
+  zalo-polling-foundation:
+    name: Zalo Polling Foundation
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Zalo polling foundation verification
+        run: ./scripts/phase-5-zalo-polling-foundation.sh
+
+  phase-review-contract:
+    name: Phase Review Contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate phase review contract assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/skills/phase-code-review/SKILL.md
+          test -f .github/skills/phase-orchestrator/SKILL.md
+          test -f docs/DEVELOPMENT_WORKFLOW.md

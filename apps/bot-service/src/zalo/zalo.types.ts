@@ -29,3 +29,24 @@ export interface ZaloConnectionFailureResult {
 }
 
 export type ZaloConnectionTestResult = ZaloConnectionSuccessResult | ZaloConnectionFailureResult;
+
+export const SUPPORTED_ZALO_EVENT_NAMES = [
+  'message.text.received',
+  'message.image.received',
+  'message.sticker.received',
+  'message.voice.received',
+  'message.unsupported.received',
+] as const;
+
+export type SupportedZaloEventName = (typeof SUPPORTED_ZALO_EVENT_NAMES)[number];
+
+export interface ZaloInboundEvent {
+  readonly source: 'polling' | 'webhook';
+  readonly eventName: string;
+  readonly supported: boolean;
+  readonly messageId?: string;
+  readonly chatType?: string;
+  readonly senderId?: string;
+  readonly recipientId?: string;
+  readonly timestamp?: number;
+}

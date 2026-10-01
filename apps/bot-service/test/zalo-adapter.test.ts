@@ -22,6 +22,7 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
     loginRateLimitWindowSeconds: 300,
     loginRateLimitMaxAttempts: 5,
     trustProxy: false,
+    zaloPollTimeoutSeconds: 30,
     ...overrides,
   };
 }
@@ -29,6 +30,7 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
 function buildClient(getMeImpl: (token?: string) => Promise<unknown>): ZaloHttpClient {
   return {
     getMe: getMeImpl,
+    getUpdates: async () => ({ ok: true, result: [] }),
   };
 }
 
@@ -257,4 +259,31 @@ test('missing token fails safely without http call', async () => {
     return true;
   });
   assert.equal(called, false);
+});
+
+test('getUpdates forwards timeout and abort signal to http client', async () => {
+  const controller = new AbortController();
+  let receivedToken = '';
+  let receivedTimeoutSeconds = -1;
+  let receivedSignal: AbortSignal | undefined;
+  const client: ZaloHttpClient = {
+    getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+    getUpdates: async (token, options) => {
+      receivedToken = token;
+      receivedTimeoutSeconds = options.timeoutSeconds;
+      receivedSignal = options.signal;
+      return { ok: true, result: null };
+    },
+  };
+
+  const adapter = new ZaloAdapter(buildConfig({ zaloBotToken: 'token-from-config' }), client);
+  const response = await adapter.getUpdates({
+    timeoutSeconds: 30,
+    signal: controller.signal,
+  });
+
+  assert.deepEqual(response, { ok: true, result: null });
+  assert.equal(receivedToken, 'token-from-config');
+  assert.equal(receivedTimeoutSeconds, 30);
+  assert.equal(receivedSignal, controller.signal);
 });

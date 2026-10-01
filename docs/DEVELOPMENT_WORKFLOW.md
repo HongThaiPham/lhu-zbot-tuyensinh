@@ -130,6 +130,12 @@ Before Phase 0 creates the pnpm workspace, `.github/workflows/ci.yml` uses a boo
 Normal PR CI must not require paid/live external services. Use mocks/fakes/test containers as specified. Never put Zalo Bot Token, provider API keys, encryption keys or production credentials in repository files, workflow YAML, PR bodies, logs or fixtures.
 Zalo integration uses the official REST API via internal adapters; do not add third-party Zalo SDK dependencies.
 
+## Phase verification scripts
+
+- Phase 3 verification: `./scripts/phase-3-auth-foundation.sh`
+- Phase 4 verification: `./scripts/phase-4-zalo-api-foundation.sh`
+- Phase 5 verification: `./scripts/phase-5-zalo-polling-foundation.sh`
+
 ## Phase 25 / Production
 
 Phase 25 performs Production Readiness Review including staging E2E, security gate, RAG evaluation, migration/restore validation, observability, rollback/runbook and the full Zalo -> queue -> conversation -> admissions/RAG -> LLM -> Zalo path.

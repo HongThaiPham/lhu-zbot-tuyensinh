@@ -36,6 +36,20 @@ export class ZaloAdapter {
     return this.normalizeIdentity(response);
   }
 
+  public async getUpdates(options: {
+    readonly timeoutSeconds: number;
+    readonly signal?: AbortSignal;
+  }): Promise<unknown> {
+    if (!this.hasConfiguredToken()) {
+      throw new ZaloIntegrationError('Zalo token is not configured', {
+        status: 'AUTHENTICATION_FAILED',
+        retryable: false,
+      });
+    }
+
+    return this.zaloHttpClient.getUpdates(this.token, options);
+  }
+
   public createSafeErrorPayload(error: unknown): Readonly<Record<string, unknown>> {
     return createSafeLogPayload(error, this.token);
   }
