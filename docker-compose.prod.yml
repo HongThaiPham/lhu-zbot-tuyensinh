@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: ./apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?must set NEXT_PUBLIC_API_BASE_URL}
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?must set NEXT_PUBLIC_API_BASE_URL}
       NODE_ENV: production
