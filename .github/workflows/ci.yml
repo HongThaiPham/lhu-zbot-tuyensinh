@@ -148,6 +148,57 @@ jobs:
         run: |
           echo "Dependency Review PASS (bootstrap state: no dependency manifests yet)."
 
+  database-foundation:
+    name: Database Foundation
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: lhu_zbot
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lhu_zbot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_NAME: lhu_zbot
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm db:prisma:generate
+
+      - name: Deploy migrations from zero
+        run: DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=public" pnpm db:migrate:deploy
+
+      - name: Seed deterministic foundation data
+        run: DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=public" pnpm db:seed
+
+      - name: Verify migration, pgvector, schema, and seed
+        run: DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=public" pnpm db:verify
+
   runtime-smoke:
     name: Runtime Smoke
     if: github.event_name == 'pull_request'

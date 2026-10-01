@@ -15,7 +15,13 @@
     "test": "turbo run test --continue",
     "format": "prettier --write .",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "smoke:compose": "bash ./scripts/phase-0-compose-smoke.sh"
+    "smoke:compose": "bash ./scripts/phase-0-compose-smoke.sh",
+    "db:prisma:generate": "pnpm --filter @lhu/database prisma:generate",
+    "db:migrate:deploy": "pnpm --filter @lhu/database db:migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @lhu/database db:migrate:dev",
+    "db:seed": "pnpm --filter @lhu/database db:seed",
+    "db:verify": "pnpm --filter @lhu/database db:verify",
+    "db:verify:fresh": "bash ./scripts/phase-2-database-foundation.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -30,7 +36,8 @@
   },
   "pnpm": {
     "overrides": {
-      "postcss": "8.5.28"
+      "postcss": "8.5.28",
+      "deepmerge-ts": "8.0.2"
     }
   }
 }

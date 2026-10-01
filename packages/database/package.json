@@ -5,16 +5,29 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "lint": "eslint . --ext .ts",
-    "typecheck": "tsc --noEmit",
-    "test": "echo 'No tests for database in Phase 0'"
+    "build": "pnpm prisma:generate && tsc -p tsconfig.json",
+    "lint": "eslint . --ext .ts,.mjs",
+    "typecheck": "pnpm prisma:generate && tsc --noEmit",
+    "test": "pnpm build && node --test ./test/**/*.test.mjs",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
+    "db:migrate:dev": "prisma migrate dev --schema ./prisma/schema.prisma",
+    "db:seed": "prisma db seed --schema ./prisma/schema.prisma",
+    "db:verify": "node ./scripts/verify-foundation.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
     "eslint": "^9.39.4",
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
-    "@types/node": "^22.15.0"
+    "@types/node": "^22.15.0",
+    "prisma": "6.19.3"
+  },
+  "prisma": {
+    "schema": "./prisma/schema.prisma",
+    "seed": "node ./prisma/seed.mjs"
   }
 }
