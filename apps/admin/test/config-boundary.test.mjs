@@ -13,7 +13,7 @@ function loadNextConfigWithEnv(overrides = {}, removedKeys = []) {
     delete env[key];
   }
 
-  return spawnSync('node', ['--input-type=module', '-e', "import('./next.config.mjs')"], {
+  return spawnSync('node', ['--input-type=module', '-e', "await import('./next.config.mjs')"], {
     cwd: adminDir,
     env,
     encoding: 'utf8',
