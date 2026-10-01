@@ -205,7 +205,7 @@ test('login keeps IP failure bucket across successful logins and still reaches 4
   );
 });
 
-test('successful login intentionally clears identity bucket while IP handling remains independent', async () => {
+test('successful login clears identity failure bucket without depending on shared IP history', async () => {
   const users = new Map<
     string,
     {
@@ -334,6 +334,7 @@ test('authenticateSession rejects unknown, revoked and expired sessions', async 
 test('authenticateSession throttles lastUsedAt writes to avoid per-request updates', async () => {
   const now = Date.now();
   const touchCalls: string[] = [];
+  let sessionLastUsedAt = new Date(now - 60_000);
   let token = '';
   const { authService, sessionService } = buildAuthService({
     session: {
@@ -348,12 +349,13 @@ test('authenticateSession throttles lastUsedAt writes to avoid per-request updat
           tokenHash,
           revokedAt: null,
           expiresAt: new Date(now + 60_000),
-          lastUsedAt: new Date(now - 60_000),
+          lastUsedAt: sessionLastUsedAt,
           user: { id: 'u1', email: 'admin@example.com', status: 'ACTIVE', roles: [] },
         };
       },
       update: async ({ where }: { where: { id: string } }) => {
         touchCalls.push(where.id);
+        sessionLastUsedAt = new Date();
         return { id: where.id };
       },
     },
@@ -368,6 +370,7 @@ test('authenticateSession throttles lastUsedAt writes to avoid per-request updat
 test('authenticateSession updates lastUsedAt when previous use is stale', async () => {
   const now = Date.now();
   const touchCalls: string[] = [];
+  let sessionLastUsedAt = new Date(now - 6 * 60_000);
   let token = '';
   const { authService, sessionService } = buildAuthService({
     session: {
@@ -382,18 +385,20 @@ test('authenticateSession updates lastUsedAt when previous use is stale', async 
           tokenHash,
           revokedAt: null,
           expiresAt: new Date(now + 60_000),
-          lastUsedAt: new Date(now - 6 * 60_000),
+          lastUsedAt: sessionLastUsedAt,
           user: { id: 'u1', email: 'admin@example.com', status: 'ACTIVE', roles: [] },
         };
       },
       update: async ({ where }: { where: { id: string } }) => {
         touchCalls.push(where.id);
+        sessionLastUsedAt = new Date();
         return { id: where.id };
       },
     },
   });
   token = sessionService.createToken();
 
+  await authService.authenticateSession(token);
   await authService.authenticateSession(token);
   assert.deepEqual(touchCalls, ['s-touch-stale']);
 });
