@@ -66,7 +66,7 @@ wait_for_http_status() {
   local deadline=$((SECONDS + timeout_seconds))
 
   while true; do
-    status=$(curl -sS -o /tmp/phase0-smoke-body.txt -w '%{http_code}' "$url" || true)
+    status=$(curl --connect-timeout 2 --max-time 5 -sS -o /tmp/phase0-smoke-body.txt -w '%{http_code}' "$url" || true)
     if [[ "$status" == "$expected" ]]; then
       return 0
     fi
@@ -84,7 +84,7 @@ wait_for_http_success() {
   local timeout_seconds="$2"
   local deadline=$((SECONDS + timeout_seconds))
 
-  until curl -fsS "$url" >/dev/null 2>&1; do
+  until curl --connect-timeout 2 --max-time 5 -fsS "$url" >/dev/null 2>&1; do
     if (( SECONDS >= deadline )); then
       echo "Timed out waiting for ${url} to respond successfully" >&2
       print_diag
@@ -92,6 +92,27 @@ wait_for_http_success() {
     fi
     sleep 2
   done
+}
+
+assert_worker_has_no_host_bindings() {
+  local worker_id="$1"
+  local host_bindings
+  host_bindings=$(docker inspect "$worker_id" --format '{{json .HostConfig.PortBindings}}')
+
+  if [[ "$host_bindings" == *'"3001/tcp"'* ]]; then
+    echo "bot-worker unexpectedly has a host binding for 3001/tcp" >&2
+    echo "HostConfig.PortBindings: ${host_bindings}" >&2
+    print_diag
+    exit 1
+  fi
+
+  local compose_port_output
+  compose_port_output=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port bot-worker 3001 2>/dev/null || true)
+  if [[ -n "$compose_port_output" ]]; then
+    echo "bot-worker unexpectedly exposes host port mapping for 3001: ${compose_port_output}" >&2
+    print_diag
+    exit 1
+  fi
 }
 
 API_BASE_URL="http://127.0.0.1:${BOT_API_PORT:-4201}"
@@ -125,9 +146,12 @@ docker logs "$worker_id" 2>&1 | grep -q "worker mode" || {
   exit 1
 }
 
+assert_worker_has_no_host_bindings "$worker_id"
+
 if docker inspect "$worker_id" --format '{{json .NetworkSettings.Ports}}' | grep -q '3001'; then
-  echo "bot-worker unexpectedly exposes port 3001" >&2
+  echo "bot-worker unexpectedly exposes port 3001 in container network metadata" >&2
   docker inspect "$worker_id" --format '{{json .NetworkSettings.Ports}}' >&2 || true
+  print_diag
   exit 1
 fi
 
