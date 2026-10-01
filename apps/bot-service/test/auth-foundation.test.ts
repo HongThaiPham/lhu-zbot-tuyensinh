@@ -334,6 +334,7 @@ test('authenticateSession rejects unknown, revoked and expired sessions', async 
 test('authenticateSession throttles lastUsedAt writes to avoid per-request updates', async () => {
   const now = Date.now();
   const touchCalls: string[] = [];
+  let token = '';
   const { authService, sessionService } = buildAuthService({
     session: {
       findUnique: async ({ where }: { where: { tokenHash: string } }) => {
@@ -357,7 +358,7 @@ test('authenticateSession throttles lastUsedAt writes to avoid per-request updat
       },
     },
   });
-  const token = sessionService.createToken();
+  token = sessionService.createToken();
 
   await authService.authenticateSession(token);
   assert.equal(touchCalls.length, 0);
@@ -366,6 +367,7 @@ test('authenticateSession throttles lastUsedAt writes to avoid per-request updat
 test('authenticateSession updates lastUsedAt when previous use is stale', async () => {
   const now = Date.now();
   const touchCalls: string[] = [];
+  let token = '';
   const { authService, sessionService } = buildAuthService({
     session: {
       findUnique: async ({ where }: { where: { tokenHash: string } }) => {
@@ -389,7 +391,7 @@ test('authenticateSession updates lastUsedAt when previous use is stale', async 
       },
     },
   });
-  const token = sessionService.createToken();
+  token = sessionService.createToken();
 
   await authService.authenticateSession(token);
   assert.deepEqual(touchCalls, ['s-touch-stale']);
