@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "src/index.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm prisma:generate && tsc -p tsconfig.json",
     "lint": "eslint . --ext .ts,.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm prisma:generate && tsc --noEmit",
     "test": "pnpm build && node --test ./test/**/*.test.mjs",
     "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
@@ -16,7 +16,7 @@
     "db:verify": "node ./scripts/verify-foundation.mjs"
   },
   "dependencies": {
-    "@prisma/client": "7.10.0"
+    "@prisma/client": "6.19.3"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
@@ -24,7 +24,7 @@
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
     "@types/node": "^22.15.0",
-    "prisma": "7.10.0"
+    "prisma": "6.19.3"
   },
   "prisma": {
     "schema": "./prisma/schema.prisma",

@@ -170,7 +170,7 @@ API_BASE_URL="http://127.0.0.1:${BOT_API_PORT:-4201}"
 ADMIN_BASE_URL="http://127.0.0.1:${ADMIN_PORT:-4100}"
 
 echo "Project: ${PROJECT_NAME}"
-docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up --build -d
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up --build -d postgres redis
 
 wait_for_healthy postgres 120
 wait_for_healthy redis 120
@@ -179,6 +179,8 @@ pnpm db:prisma:generate
 DATABASE_URL="$DB_VERIFY_URL" pnpm db:migrate:deploy
 DATABASE_URL="$DB_VERIFY_URL" pnpm db:seed
 DATABASE_URL="$DB_VERIFY_URL" pnpm db:verify
+
+docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up --build -d bot-api bot-worker admin
 
 wait_for_http_success "${API_BASE_URL}/health/live" 120
 wait_for_http_status "${API_BASE_URL}/health/ready" 200 120
