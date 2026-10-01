@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "pnpm --filter @lhu/config build && nest build",
-    "start": "pnpm --filter @lhu/config build && node dist/main",
+    "start": "node dist/main",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "echo 'No tests for bot-service in Phase 0'"

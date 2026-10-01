@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm --filter @lhu/config build && next dev",
     "build": "pnpm --filter @lhu/config build && next build",
-    "start": "pnpm --filter @lhu/config build && next start",
+    "start": "next start",
     "lint": "pnpm --filter @lhu/config build && next lint",
     "typecheck": "tsc --noEmit",
     "test": "echo 'No tests for admin in Phase 0'"

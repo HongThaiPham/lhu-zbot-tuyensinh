@@ -55,7 +55,7 @@ const botServiceEnvSchema = z.object({
 
 const adminEnvSchema = z.object({
   NODE_ENV: z.enum(NODE_ENV_VALUES),
-  NEXT_PUBLIC_API_BASE_URL: z.string().url(),
+  NEXT_PUBLIC_API_BASE_URL: z.string().url().optional(),
 });
 
 export class ConfigValidationError extends Error {
@@ -179,8 +179,11 @@ export function loadAdminConfig(rawEnv: Readonly<Record<string, string | undefin
     throw new ConfigValidationError(toIssues(parsed.error));
   }
 
+  const nextPublicApiBaseUrl =
+    parsed.data.NEXT_PUBLIC_API_BASE_URL?.trim() || 'http://127.0.0.1:4201';
+
   const nextPublicApiBaseUrlIssue = parseUrl(
-    parsed.data.NEXT_PUBLIC_API_BASE_URL,
+    nextPublicApiBaseUrl,
     'NEXT_PUBLIC_API_BASE_URL',
     WEB_PROTOCOLS,
   );
@@ -191,6 +194,6 @@ export function loadAdminConfig(rawEnv: Readonly<Record<string, string | undefin
 
   return Object.freeze({
     nodeEnv: parsed.data.NODE_ENV,
-    nextPublicApiBaseUrl: parsed.data.NEXT_PUBLIC_API_BASE_URL,
+    nextPublicApiBaseUrl,
   });
 }
