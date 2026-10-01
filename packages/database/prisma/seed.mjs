@@ -20,7 +20,7 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error('Database seed failed');
+    console.error('Database seed failed', error);
     throw error;
   })
   .finally(async () => {

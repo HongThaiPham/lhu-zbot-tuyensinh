@@ -54,7 +54,7 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error('Database foundation verification failed');
+    console.error('Database foundation verification failed', error);
     throw error;
   })
   .finally(async () => {
