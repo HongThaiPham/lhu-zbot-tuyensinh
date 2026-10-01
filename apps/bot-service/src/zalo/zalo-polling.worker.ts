@@ -111,17 +111,18 @@ export class ZaloPollingWorker implements OnApplicationBootstrap, OnApplicationS
   }
 
   private nextDelay(error: ZaloIntegrationError): number {
+    if (!error.retryable) {
+      this.backoffMs = ZALO_POLL_BACKOFF_MAX_MS;
+      return ZALO_POLL_BACKOFF_MAX_MS;
+    }
+
     const retryAfterDelayMs =
       typeof error.retryAfterSeconds === 'number' && error.retryAfterSeconds > 0
         ? error.retryAfterSeconds * 1_000
         : undefined;
 
     const delayMs = retryAfterDelayMs ?? this.backoffMs;
-    if (error.retryable) {
-      this.backoffMs = Math.min(this.backoffMs * 2, ZALO_POLL_BACKOFF_MAX_MS);
-    } else {
-      this.backoffMs = ZALO_POLL_BACKOFF_MAX_MS;
-    }
+    this.backoffMs = Math.min(this.backoffMs * 2, ZALO_POLL_BACKOFF_MAX_MS);
 
     return Math.min(delayMs, ZALO_POLL_BACKOFF_MAX_MS);
   }
