@@ -11,7 +11,7 @@ This repository bootstraps the LHU admissions assistant monorepo for a Next.js a
 ## Configuration
 
 - Canonical runtime configuration is implemented in `packages/config`.
-- See `/home/runner/work/lhu-zbot-tuyensinh/lhu-zbot-tuyensinh/docs/CONFIGURATION.md` for variable rules, startup validation, and production secret requirements.
+- See `docs/CONFIGURATION.md` for variable rules, startup validation, and production secret requirements.
 
 ## Local development
 

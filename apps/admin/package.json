@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @lhu/config build && next dev",
-    "build": "pnpm --filter @lhu/config build && next build",
-    "start": "next start",
-    "lint": "pnpm --filter @lhu/config build && next lint",
+    "dev": "export NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:4201}; pnpm --filter @lhu/config build && next dev",
+    "build": "export NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:4201}; pnpm --filter @lhu/config build && next build",
+    "start": "export NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:4201}; next start",
+    "lint": "export NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:4201}; pnpm --filter @lhu/config build && next lint",
     "typecheck": "tsc --noEmit",
     "test": "echo 'No tests for admin in Phase 0'"
   },
