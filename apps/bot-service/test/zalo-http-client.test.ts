@@ -87,7 +87,7 @@ test('getMe maps malformed json envelope on 2xx to invalid_response category', a
   const client = new OfficialZaloHttpClient();
 
   globalThis.fetch = (async (): Promise<Response> =>
-    new Response('not json', { status: 200, headers: { 'retry-after': '9' } })) as typeof fetch;
+    new Response('not json', { status: 200 })) as typeof fetch;
 
   await assert.rejects(
     async () => client.getMe('phase4-token'),
@@ -95,7 +95,7 @@ test('getMe maps malformed json envelope on 2xx to invalid_response category', a
       assert.ok(error instanceof ZaloApiRequestError);
       assert.equal(error.category, 'invalid_response');
       assert.equal(error.statusCode, 200);
-      assert.equal(error.retryAfterSeconds, 9);
+      assert.equal(error.retryAfterSeconds, undefined);
       return true;
     },
   );

@@ -21,18 +21,43 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ZALO_CONNECTION_TIMEOUT_MS);
-
-    let response: Response;
-
     try {
-      response = await fetch(url, {
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
         },
         signal: controller.signal,
       });
+
+      if (!response.ok) {
+        const errorEnvelope = await this.extractErrorEnvelope(response);
+        throw new ZaloApiRequestError('Zalo API returned HTTP error', {
+          category: 'http_error',
+          requestUrl,
+          statusCode: response.status,
+          upstreamCode: errorEnvelope.error_code,
+          retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
+        });
+      }
+
+      const payload = await this.parseEnvelope(response, requestUrl);
+      if (payload.ok !== true) {
+        throw new ZaloApiRequestError('Zalo API returned unsuccessful response', {
+          category: 'api_error',
+          requestUrl,
+          statusCode: response.status,
+          upstreamCode: payload.error_code,
+          retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
+        });
+      }
+
+      return payload;
     } catch (error) {
+      if (error instanceof ZaloApiRequestError) {
+        throw error;
+      }
+
       const errorName =
         error instanceof Error
           ? error.name
@@ -53,30 +78,6 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
     } finally {
       clearTimeout(timer);
     }
-
-    if (!response.ok) {
-      const errorEnvelope = await this.extractErrorEnvelope(response);
-      throw new ZaloApiRequestError('Zalo API returned HTTP error', {
-        category: 'http_error',
-        requestUrl,
-        statusCode: response.status,
-        upstreamCode: errorEnvelope.error_code,
-        retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
-      });
-    }
-
-    const payload = await this.parseEnvelope(response, requestUrl);
-    if (payload.ok !== true) {
-      throw new ZaloApiRequestError('Zalo API returned unsuccessful response', {
-        category: 'api_error',
-        requestUrl,
-        statusCode: response.status,
-        upstreamCode: payload.error_code,
-        retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
-      });
-    }
-
-    return payload;
   }
 
   private async parseEnvelope(response: Response, requestUrl: string): Promise<ZaloApiEnvelope> {
