@@ -130,7 +130,9 @@ function toIssues(error: z.ZodError): string[] {
   });
 }
 
-export function loadBotServiceConfig(rawEnv: NodeJS.ProcessEnv): BotServiceConfig {
+export function loadBotServiceConfig(
+  rawEnv: Readonly<Record<string, string | undefined>>,
+): BotServiceConfig {
   const parsed = botServiceEnvSchema.safeParse(rawEnv);
   if (!parsed.success) {
     throw new ConfigValidationError(toIssues(parsed.error));
@@ -171,7 +173,7 @@ export function loadBotServiceConfig(rawEnv: NodeJS.ProcessEnv): BotServiceConfi
   });
 }
 
-export function loadAdminConfig(rawEnv: NodeJS.ProcessEnv): AdminConfig {
+export function loadAdminConfig(rawEnv: Readonly<Record<string, string | undefined>>): AdminConfig {
   const parsed = adminEnvSchema.safeParse(rawEnv);
   if (!parsed.success) {
     throw new ConfigValidationError(toIssues(parsed.error));

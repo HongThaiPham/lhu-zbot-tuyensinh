@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "nest build",
-    "start": "node dist/main",
+    "build": "pnpm --filter @lhu/config build && nest build",
+    "start": "pnpm --filter @lhu/config build && node dist/main",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "echo 'No tests for bot-service in Phase 0'"
