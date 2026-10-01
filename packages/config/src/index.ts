@@ -124,6 +124,8 @@ function toIssues(error: z.ZodError): string[] {
       if (envName === 'PORT') {
         return `${envName}: must be a valid TCP port (1-65535)`;
       }
+
+      return `${envName}: invalid value`;
     }
 
     return 'Configuration contains invalid values';
