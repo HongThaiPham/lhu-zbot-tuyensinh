@@ -104,23 +104,41 @@ wait_for_http_success() {
 
 assert_worker_has_no_host_bindings() {
   local worker_id="$1"
-  local host_bindings
-  host_bindings=$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$worker_id")
 
-  if [[ "$host_bindings" == *'"3001/tcp"'* ]]; then
-    echo "bot-worker unexpectedly has a host binding for 3001/tcp" >&2
-    echo "HostConfig.PortBindings: ${host_bindings}" >&2
-    print_diag
-    exit 1
+  if python - "$worker_id" <<'PY'
+import json
+import subprocess
+import sys
+worker_id = sys.argv[1]
+
+def parse_binding_json(field):
+    raw = subprocess.check_output(["docker", "inspect", "--format", field, worker_id], text=True)
+    try:
+        return json.loads(raw or '{}')
+    except json.JSONDecodeError:
+        return {}
+
+for label, field in [
+    ("HostConfig.PortBindings", '{{json .HostConfig.PortBindings}}'),
+    ("NetworkSettings.Ports", '{{json .NetworkSettings.Ports}}'),
+]:
+    ports = parse_binding_json(field)
+    mappings = ports.get("3001/tcp") or []
+    for entry in mappings:
+        if isinstance(entry, dict):
+            host_port = entry.get("HostPort")
+            if host_port not in (None, "", "0"):
+                print(f"bot-worker unexpectedly has a host binding for 3001/tcp in {label}: {json.dumps(ports)}", file=sys.stderr)
+                raise SystemExit(1)
+print("worker 3001 binding check passed", file=sys.stderr)
+PY
+  then
+    return 0
   fi
 
-  local compose_port_output
-  compose_port_output=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port bot-worker 3001 2>/dev/null || true)
-  if [[ -n "$compose_port_output" ]]; then
-    echo "bot-worker unexpectedly exposes host port mapping for 3001: ${compose_port_output}" >&2
-    print_diag
-    exit 1
-  fi
+  echo "bot-worker unexpectedly has a host binding for 3001/tcp" >&2
+  print_diag
+  exit 1
 }
 
 API_BASE_URL="http://127.0.0.1:${BOT_API_PORT:-4201}"
@@ -156,7 +174,23 @@ docker logs "$worker_id" 2>&1 | grep -q "worker mode" || {
 
 assert_worker_has_no_host_bindings "$worker_id"
 
-if docker inspect --format '{{json .NetworkSettings.Ports}}' "$worker_id" | grep -q '"3001/tcp"'; then
+if python - "$worker_id" <<'PY'
+import json
+import subprocess
+import sys
+worker_id = sys.argv[1]
+raw = subprocess.check_output(["docker", "inspect", "--format", '{{json .NetworkSettings.Ports}}', worker_id], text=True)
+ports = json.loads(raw or '{}')
+port_bindings = ports.get('3001/tcp') or []
+for entry in port_bindings:
+    if isinstance(entry, dict) and entry.get('HostPort') not in (None, '', '0'):
+        print(json.dumps({"3001/tcp": port_bindings}), file=sys.stderr)
+        raise SystemExit(1)
+raise SystemExit(0)
+PY
+then
+  :
+else
   echo "bot-worker unexpectedly exposes port 3001 in container network metadata" >&2
   docker inspect --format '{{json .NetworkSettings.Ports}}' "$worker_id" >&2 || true
   print_diag
