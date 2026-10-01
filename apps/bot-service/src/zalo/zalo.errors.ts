@@ -143,6 +143,22 @@ function isNetworkError(input: unknown): boolean {
   return record?.response == null;
 }
 
+function isRateLimited(statusCode: number | undefined, upstreamCode: string | number | undefined): boolean {
+  if (statusCode === 429) {
+    return true;
+  }
+
+  if (upstreamCode === undefined) {
+    return false;
+  }
+
+  if (upstreamCode === 429 || upstreamCode === '429') {
+    return true;
+  }
+
+  return false;
+}
+
 export function mapHttpError(error: unknown): ZaloIntegrationError {
   if (error instanceof ZaloApiRequestError) {
     if (error.category === 'timeout' || error.category === 'network_error') {
@@ -173,7 +189,7 @@ export function mapHttpError(error: unknown): ZaloIntegrationError {
       });
     }
 
-    if (error.statusCode === 429 || error.upstreamCode === 429) {
+    if (isRateLimited(error.statusCode, error.upstreamCode)) {
       return new ZaloIntegrationError('Zalo rate limit encountered', {
         status: 'RATE_LIMITED',
         retryable: true,
@@ -205,7 +221,7 @@ export function mapHttpError(error: unknown): ZaloIntegrationError {
     });
   }
 
-  if (statusCode === 429 || upstreamCode === 429) {
+  if (isRateLimited(statusCode, upstreamCode)) {
     return new ZaloIntegrationError('Zalo rate limit encountered', {
       status: 'RATE_LIMITED',
       retryable: true,

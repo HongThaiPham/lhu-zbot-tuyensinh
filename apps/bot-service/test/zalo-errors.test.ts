@@ -48,6 +48,19 @@ test('rate limit failures map to RATE_LIMITED', () => {
   assert.equal(mapped.retryAfterSeconds, 12);
 });
 
+test('string upstream code 429 maps to RATE_LIMITED', () => {
+  const mapped = mapHttpError(
+    new ZaloApiRequestError('rate limit', {
+      category: 'api_error',
+      statusCode: 200,
+      upstreamCode: '429',
+    }),
+  );
+
+  assert.equal(mapped.status, 'RATE_LIMITED');
+  assert.equal(mapped.retryable, true);
+});
+
 test('network failures map to NETWORK_ERROR', () => {
   const mapped = mapHttpError({
     code: 'ECONNREFUSED',

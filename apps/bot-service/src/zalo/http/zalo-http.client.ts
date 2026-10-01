@@ -126,7 +126,7 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
 
   private async extractErrorEnvelope(response: Response): Promise<Partial<ZaloApiEnvelope>> {
     try {
-      const data = await response.clone().json();
+      const data = await response.json();
       if (!data || typeof data !== 'object') {
         return {};
       }
