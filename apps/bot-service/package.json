@@ -6,7 +6,7 @@
     "build": "pnpm --filter @lhu/config build && pnpm --filter @lhu/database build && nest build",
     "start": "node dist/main",
     "lint": "eslint . --ext .ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm --filter @lhu/database build && tsc --noEmit",
     "test": "echo 'No tests for bot-service in Phase 0'"
   },
   "dependencies": {
