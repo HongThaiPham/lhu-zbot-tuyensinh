@@ -2,7 +2,7 @@
 
 ## References consulted
 
-- Official Zalo Bot docs target: `https://docs.zaloplatforms.com/docs/BOT` (DNS lookup was unavailable from this CI/sandbox runtime, so verification used the installed SDK API surface plus package README/source inspection).
+- Official Zalo Bot docs target: `https://docs.zaloplatforms.com/docs/BOT` (still DNS-unreachable from this CI/sandbox runtime at verification time, so runtime contract verification relies on installed SDK source/runtime inspection rather than guessing).
 - Installed SDK package: `node-zalo-bot@0.1.6`.
 
 ## SDK surface used in Phase 4
@@ -35,12 +35,29 @@ No non-Zalo module instantiates SDK objects directly.
 
 ## getMe identity mapping
 
-The adapter normalizes `getMe` into internal `ZaloBotIdentity`:
+### Verified `getMe` runtime contract (`node-zalo-bot@0.1.6`)
+
+From installed package runtime/source:
+
+- `getMe()` delegates to `_request('getMe', { form: options })`
+- `_request(...)` resolves **`response.data.result`** when `response.data.ok === true`
+- `_request(...)` throws `ZaloError` when `response.data.ok !== true`
+
+Evidence:
+
+- `node_modules/.pnpm/node-zalo-bot@0.1.6_request@2.88.2/node_modules/node-zalo-bot/src/zalo.js` (runtime source)
+- Runtime introspection via `ZaloBot.prototype.getMe.toString()` and `ZaloBot.prototype._request.toString()`
+
+Therefore, the adapter treats the direct resolved object as the primary contract, and only supports envelope-shaped payloads defensively (mapping malformed/unsuccessful envelopes to `INVALID_RESPONSE`).
+
+### Internal normalization
+
+The adapter normalizes verified `getMe` result into internal `ZaloBotIdentity`:
 
 - required: `id` (stringified)
 - optional (if present): `name -> displayName`, `username`, `avatar`
 
-Malformed payloads map to `INVALID_RESPONSE`.
+Malformed payloads and malformed/unsuccessful envelopes map to `INVALID_RESPONSE`.
 
 ## Connection test behavior
 

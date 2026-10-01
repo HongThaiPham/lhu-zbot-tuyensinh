@@ -63,30 +63,6 @@ test('admin zalo service audits connection test action and returns safe result',
     retryAfterSeconds: undefined,
     upstreamCode: undefined,
   });
-
-  test('non-admin user is rejected by roles guard for admin zalo endpoint', () => {
-    const guard = new RolesGuard({
-      getAllAndOverride: () => ['ADMIN'],
-    } as never);
-
-    const context = {
-      getHandler: () => AdminZaloController.prototype.testConnection,
-      getClass: () => AdminZaloController,
-      switchToHttp: () => ({
-        getRequest: () => ({
-          [REQUEST_USER_KEY]: {
-            id: 'viewer-1',
-            email: 'viewer@example.com',
-            status: 'ACTIVE',
-            roles: ['VIEWER'],
-            sessionId: 'session-1',
-          },
-        }),
-      }),
-    };
-
-    assert.throws(() => guard.canActivate(context as never), ForbiddenException);
-  });
   assert.deepEqual(auditCalls, [
     {
       actorUserId: 'admin-1',
@@ -98,4 +74,28 @@ test('admin zalo service audits connection test action and returns safe result',
       },
     },
   ]);
+});
+
+test('non-admin user is rejected by roles guard for admin zalo endpoint', () => {
+  const guard = new RolesGuard({
+    getAllAndOverride: () => ['ADMIN'],
+  } as never);
+
+  const context = {
+    getHandler: () => AdminZaloController.prototype.testConnection,
+    getClass: () => AdminZaloController,
+    switchToHttp: () => ({
+      getRequest: () => ({
+        [REQUEST_USER_KEY]: {
+          id: 'viewer-1',
+          email: 'viewer@example.com',
+          status: 'ACTIVE',
+          roles: ['VIEWER'],
+          sessionId: 'session-1',
+        },
+      }),
+    }),
+  };
+
+  assert.throws(() => guard.canActivate(context as never), ForbiddenException);
 });

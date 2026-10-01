@@ -71,7 +71,7 @@ export class ZaloAdapter {
   }
 
   private normalizeIdentity(response: unknown): ZaloBotIdentity {
-    const payload = this.toRecord(response);
+    const payload = this.extractIdentityPayload(response);
     const id = payload.id;
     if (typeof id !== 'string' && typeof id !== 'number') {
       throw new ZaloIntegrationError('Zalo getMe returned invalid identity payload', {
@@ -96,6 +96,30 @@ export class ZaloAdapter {
       ...(maybeUsername ? { username: maybeUsername } : {}),
       ...(maybeAvatar ? { avatar: maybeAvatar } : {}),
     };
+  }
+
+  private extractIdentityPayload(response: unknown): Record<string, unknown> {
+    const payload = this.toRecord(response);
+    if (!('ok' in payload)) {
+      return payload;
+    }
+
+    if (payload.ok !== true) {
+      throw new ZaloIntegrationError('Zalo getMe returned unsuccessful response envelope', {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
+    }
+
+    const result = payload.result;
+    if (!result || typeof result !== 'object') {
+      throw new ZaloIntegrationError('Zalo getMe response envelope missing result payload', {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
+    }
+
+    return result as Record<string, unknown>;
   }
 
   private toRecord(input: unknown): Record<string, unknown> {
