@@ -34,6 +34,7 @@ export interface BotServiceConfig {
   readonly redisUrl: string;
   readonly botServiceRole: BotServiceRole;
   readonly zaloUpdateMode: ZaloUpdateMode;
+  readonly zaloBotToken: string;
   readonly port: number;
   readonly appEncryptionKey: string;
   readonly sessionCookieName: string;
@@ -63,6 +64,7 @@ const botServiceEnvSchema = z.object({
   REDIS_URL: z.string().url(),
   BOT_SERVICE_ROLE: z.enum(BOT_SERVICE_ROLE_VALUES),
   ZALO_UPDATE_MODE: z.enum(ZALO_UPDATE_MODE_VALUES),
+  ZALO_BOT_TOKEN: z.string().optional(),
   PORT: portSchema.default(3001),
   APP_ENCRYPTION_KEY: z.string().optional(),
   SESSION_COOKIE_NAME: z.string().trim().min(1).max(128).default('lhu_admin_session'),
@@ -113,7 +115,11 @@ function isPlaceholderSecret(secret: string): boolean {
   return PRODUCTION_SECRET_PLACEHOLDERS.has(secret.toLowerCase());
 }
 
-function validateProductionSecret(secret: string | undefined, envName: string): string[] {
+function validateProductionSecret(
+  secret: string | undefined,
+  envName: string,
+  options: { readonly minLength?: number; readonly rejectWhitespace?: boolean } = {},
+): string[] {
   const issues: string[] = [];
   const normalizedSecret = secret?.trim() ?? '';
 
@@ -126,11 +132,11 @@ function validateProductionSecret(secret: string | undefined, envName: string): 
     issues.push(`${envName}: placeholder/default values are not allowed in production`);
   }
 
-  if (normalizedSecret.length < 32) {
+  if (typeof options.minLength === 'number' && normalizedSecret.length < options.minLength) {
     issues.push(`${envName}: must be at least 32 characters in production`);
   }
 
-  if (/\s/.test(normalizedSecret)) {
+  if (options.rejectWhitespace && /\s/.test(normalizedSecret)) {
     issues.push(`${envName}: must not contain whitespace`);
   }
 
@@ -187,7 +193,13 @@ export function loadBotServiceConfig(
   }
 
   if (parsed.data.NODE_ENV === 'production') {
-    additionalIssues.push(...validateProductionSecret(parsed.data.APP_ENCRYPTION_KEY, 'APP_ENCRYPTION_KEY'));
+    additionalIssues.push(
+      ...validateProductionSecret(parsed.data.APP_ENCRYPTION_KEY, 'APP_ENCRYPTION_KEY', {
+        minLength: 32,
+        rejectWhitespace: true,
+      }),
+    );
+    additionalIssues.push(...validateProductionSecret(parsed.data.ZALO_BOT_TOKEN, 'ZALO_BOT_TOKEN'));
   }
 
   if (additionalIssues.length > 0) {
@@ -204,6 +216,7 @@ export function loadBotServiceConfig(
     redisUrl: parsed.data.REDIS_URL,
     botServiceRole: parsed.data.BOT_SERVICE_ROLE,
     zaloUpdateMode: parsed.data.ZALO_UPDATE_MODE,
+    zaloBotToken: parsed.data.ZALO_BOT_TOKEN?.trim() || '',
     port: parsed.data.PORT,
     appEncryptionKey: normalizedKey,
     sessionCookieName: parsed.data.SESSION_COOKIE_NAME,

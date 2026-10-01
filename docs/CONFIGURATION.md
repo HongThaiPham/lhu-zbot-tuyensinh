@@ -25,6 +25,7 @@
 - `REDIS_URL` (`redis://` or `rediss://`) — required
 - `BOT_SERVICE_ROLE` (`api | worker`) — required
 - `ZALO_UPDATE_MODE` (`polling | webhook`) — required
+- `ZALO_BOT_TOKEN` — required in production, optional in development/test for deterministic mock-based tests
 - `PORT` (TCP port 1-65535) — optional, defaults to `3001`
 - `APP_ENCRYPTION_KEY` — required in production
 - `SESSION_COOKIE_NAME` — cookie name for opaque admin session (default: `lhu_admin_session`)
@@ -43,15 +44,17 @@
 
 ## Secret classification
 
-- Secret in Phase 3: `APP_ENCRYPTION_KEY`, `ADMIN_BOOTSTRAP_PASSWORD`
+- Secret in Phase 4: `APP_ENCRYPTION_KEY`, `ADMIN_BOOTSTRAP_PASSWORD`, `ZALO_BOT_TOKEN`
 - Public in Phase 3: `NEXT_PUBLIC_API_BASE_URL`
 
 `APP_ENCRYPTION_KEY` must never be logged or rendered in error output. Production startup fails if it is missing, empty, placeholder/default, too short, or malformed.
+`ZALO_BOT_TOKEN` must never be logged or rendered in error output. Production startup fails if it is missing/empty or a placeholder/default value.
 
 ## Docker Compose usage
 
 - `docker-compose.yml` (development) provides safe local defaults.
 - `docker-compose.prod.yml` requires explicit production-sensitive values, including `APP_ENCRYPTION_KEY`.
+- `docker-compose.prod.yml` requires explicit `ZALO_BOT_TOKEN`.
 - PostgreSQL and Redis remain internal-only in production topology (no public host port mapping).
 
 ## Startup validation and fail-fast behavior
@@ -59,6 +62,7 @@
 On invalid configuration, startup fails immediately with a safe error format:
 
 - `APP_ENCRYPTION_KEY: required in production`
+- `ZALO_BOT_TOKEN: required in production`
 - `BOT_SERVICE_ROLE: invalid value`
 
 Values are never included in error messages.

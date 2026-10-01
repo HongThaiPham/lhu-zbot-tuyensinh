@@ -15,6 +15,7 @@ function buildBotEnv(overrides = {}) {
     REDIS_URL: 'redis://localhost:6379',
     BOT_SERVICE_ROLE: 'api',
     ZALO_UPDATE_MODE: 'polling',
+    ZALO_BOT_TOKEN: 'development-zalo-token-placeholder',
     PORT: '3001',
     APP_ENCRYPTION_KEY: 'development-only-app-encryption-key-not-for-production',
     SESSION_COOKIE_NAME: 'lhu_admin_session',
@@ -49,8 +50,14 @@ test('valid development bot config parses', () => {
   assert.equal(config.nodeEnv, 'development');
   assert.equal(config.botServiceRole, 'api');
   assert.equal(config.zaloUpdateMode, 'polling');
+  assert.equal(config.zaloBotToken, 'development-zalo-token-placeholder');
   assert.equal(config.sessionCookieName, 'lhu_admin_session');
   assert.equal(config.trustProxy, false);
+});
+
+test('development config can omit zalo token for deterministic tests', () => {
+  const config = loadBotServiceConfig(buildBotEnv({ ZALO_BOT_TOKEN: undefined }));
+  assert.equal(config.zaloBotToken, '');
 });
 
 test('valid production bot config parses', () => {
@@ -73,6 +80,25 @@ test('missing production secret fails', () => {
     () => loadBotServiceConfig(buildBotEnv({ NODE_ENV: 'production', APP_ENCRYPTION_KEY: undefined })),
     'APP_ENCRYPTION_KEY: required in production',
   );
+});
+
+test('missing production zalo token fails', () => {
+  assertConfigError(
+    () => loadBotServiceConfig(buildBotEnv({ NODE_ENV: 'production', ZALO_BOT_TOKEN: undefined })),
+    'ZALO_BOT_TOKEN: required in production',
+  );
+});
+
+test('placeholder production zalo token fails', () => {
+  assertConfigError(
+    () => loadBotServiceConfig(buildBotEnv({ NODE_ENV: 'production', ZALO_BOT_TOKEN: 'placeholder' })),
+    'ZALO_BOT_TOKEN: placeholder/default values are not allowed in production',
+  );
+});
+
+test('unrelated loaders do not require zalo token', () => {
+  const config = loadAdminConfig(buildAdminEnv());
+  assert.equal(config.nodeEnv, 'development');
 });
 
 test('placeholder production secret fails', () => {
