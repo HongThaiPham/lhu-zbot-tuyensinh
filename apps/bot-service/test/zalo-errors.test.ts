@@ -8,11 +8,11 @@ import {
 } from '../src/zalo/zalo.errors';
 
 test('token-bearing zalo url is redacted', () => {
-  const token = 'abc-super-secret-token';
-  const rawUrl = `https://bot-api.zapps.me/bot${token}/getMe`;
+  const token = '123456:SECRET';
+  const rawUrl = `https://bot-api.zaloplatforms.com/bot${token}/getMe`;
   const redacted = sanitizeZaloUrl(rawUrl, token);
 
-  assert.equal(redacted, 'https://bot-api.zapps.me/bot[REDACTED]/getMe');
+  assert.equal(redacted, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getMe');
   assert.equal(redacted.includes(token), false);
 });
 
@@ -75,7 +75,7 @@ test('client timeout failures map to NETWORK_ERROR', () => {
   const mapped = mapHttpError(
     new ZaloApiRequestError('timeout', {
       category: 'timeout',
-      requestUrl: 'https://bot-api.zapps.me/bot[REDACTED]/getMe',
+      requestUrl: 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getMe',
     }),
   );
 
@@ -90,7 +90,7 @@ test('safe log payload redacts request url token', () => {
       name: 'AxiosError',
       code: 'ERR_BAD_REQUEST',
       config: {
-        url: `https://bot-api.zapps.me/bot${token}/getMe`,
+        url: `https://bot-api.zaloplatforms.com/bot${token}/getMe`,
       },
       response: {
         status: 400,

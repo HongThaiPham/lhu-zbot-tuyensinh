@@ -8,9 +8,9 @@ export type ZaloConnectionStatus =
 
 export interface ZaloBotIdentity {
   readonly id: string;
-  readonly displayName?: string;
-  readonly username?: string;
-  readonly avatar?: string;
+  readonly accountName: string;
+  readonly accountType: string;
+  readonly canJoinGroups: boolean;
 }
 
 export interface ZaloConnectionSuccessResult {

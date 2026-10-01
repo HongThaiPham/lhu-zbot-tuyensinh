@@ -28,7 +28,6 @@ Phase 4 permanently uses direct official REST integration (no third-party SDK):
 
 ## Third-party SDK policy
 
-- `node-zalo-bot`: removed
 - Third-party Zalo SDK dependencies: none
 
 ## Configuration
@@ -39,9 +38,10 @@ Phase 4 permanently uses direct official REST integration (no third-party SDK):
 
 ## HTTP transport contract (Phase 4)
 
-- Base URL: `https://bot-api.zapps.me`
+- Base URL: `https://bot-api.zaloplatforms.com`
 - Tokenized endpoint pattern: `/bot{token}/{method}`
 - Implemented method in Phase 4: `getMe` only
+- Method: `POST /bot<BOT_TOKEN>/getMe` (empty JSON object body)
 - Request timeout: 5 seconds
 - Response expectation for `getMe`: JSON envelope with `ok` boolean and `result` object
 - Unsuccessful envelope (`ok !== true`) is normalized to safe error categories without leaking token
@@ -50,11 +50,11 @@ Phase 4 permanently uses direct official REST integration (no third-party SDK):
 
 `ZaloAdapter` maps `result` to internal `ZaloBotIdentity`:
 
-- required: `id` (`string | number`, normalized to string)
-- optional:
-  - `name` -> `displayName`
-  - `username`
-  - `avatar`
+- required:
+  - `id` -> `id`
+  - `account_name` -> `accountName`
+  - `account_type` -> `accountType`
+  - `can_join_groups` -> `canJoinGroups`
 
 Invalid/malformed envelope or identity payload maps to `INVALID_RESPONSE`.
 

@@ -87,28 +87,26 @@ export class ZaloAdapter {
 
     const payload = result as Record<string, unknown>;
     const id = payload.id;
-    if (typeof id !== 'string' && typeof id !== 'number') {
+    const accountName = payload.account_name;
+    const accountType = payload.account_type;
+    const canJoinGroups = payload.can_join_groups;
+    if (
+      typeof id !== 'string'
+      || typeof accountName !== 'string'
+      || typeof accountType !== 'string'
+      || typeof canJoinGroups !== 'boolean'
+    ) {
       throw new ZaloIntegrationError('Zalo getMe returned invalid identity payload', {
         status: 'INVALID_RESPONSE',
         retryable: false,
       });
     }
 
-    const maybeDisplayName = typeof payload.name === 'string' && payload.name.trim().length > 0
-      ? payload.name.trim()
-      : undefined;
-    const maybeUsername = typeof payload.username === 'string' && payload.username.trim().length > 0
-      ? payload.username.trim()
-      : undefined;
-    const maybeAvatar = typeof payload.avatar === 'string' && payload.avatar.trim().length > 0
-      ? payload.avatar.trim()
-      : undefined;
-
     return {
-      id: String(id),
-      ...(maybeDisplayName ? { displayName: maybeDisplayName } : {}),
-      ...(maybeUsername ? { username: maybeUsername } : {}),
-      ...(maybeAvatar ? { avatar: maybeAvatar } : {}),
+      id: id.trim(),
+      accountName: accountName.trim(),
+      accountType: accountType.trim(),
+      canJoinGroups,
     };
   }
 

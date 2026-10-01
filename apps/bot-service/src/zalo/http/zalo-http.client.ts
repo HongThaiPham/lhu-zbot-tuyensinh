@@ -12,21 +12,30 @@ interface ZaloApiEnvelope {
 @Injectable()
 export class OfficialZaloHttpClient implements ZaloHttpClient {
   public async getMe(token: string): Promise<unknown> {
-    return this.callApi(token, 'getMe');
+    return this.callApi(token, 'getMe', {
+      method: 'POST',
+      body: {},
+    });
   }
 
-  private async callApi(token: string, method: string): Promise<ZaloApiEnvelope> {
-    const url = `${ZALO_API_BASE_URL}/bot${token}/${method}`;
+  private async callApi(
+    token: string,
+    functionName: string,
+    request: { readonly method: 'GET' | 'POST'; readonly body?: Record<string, unknown> },
+  ): Promise<ZaloApiEnvelope> {
+    const url = `${ZALO_API_BASE_URL}/bot${token}/${functionName}`;
     const requestUrl = sanitizeZaloUrl(url, token);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ZALO_CONNECTION_TIMEOUT_MS);
     try {
       const response = await fetch(url, {
-        method: 'GET',
+        method: request.method,
         headers: {
           Accept: 'application/json',
+          ...(request.method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
         },
+        ...(request.method === 'POST' ? { body: JSON.stringify(request.body ?? {}) } : {}),
         signal: controller.signal,
       });
 

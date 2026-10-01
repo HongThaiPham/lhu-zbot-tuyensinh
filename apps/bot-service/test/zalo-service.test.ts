@@ -13,7 +13,9 @@ test('raw transport response does not leak outside zalo service boundary', async
   const service = new ZaloService({
     getIdentity: async () => ({
       id: String((rawResponse as { id: string }).id),
-      displayName: 'LHU Bot',
+      accountName: 'bot.VDKyGxQvc',
+      accountType: 'BASIC',
+      canJoinGroups: false,
     }),
     mapError: () => {
       throw new Error('should not run');
@@ -28,7 +30,9 @@ test('raw transport response does not leak outside zalo service boundary', async
     status: 'CONNECTED',
     identity: {
       id: 'bot-1',
-      displayName: 'LHU Bot',
+      accountName: 'bot.VDKyGxQvc',
+      accountType: 'BASIC',
+      canJoinGroups: false,
     },
   });
   assert.equal('transport' in result, false);
@@ -76,7 +80,7 @@ test('service log output excludes token values', async () => {
           status: 401,
         },
         config: {
-          url: `https://bot-api.zapps.me/bot${token}/getMe`,
+          url: `https://bot-api.zaloplatforms.com/bot${token}/getMe`,
         },
       };
     },
@@ -87,7 +91,7 @@ test('service log output excludes token values', async () => {
         statusCode: 401,
       }),
     createSafeErrorPayload: () => ({
-      requestUrl: 'https://bot-api.zapps.me/bot[REDACTED]/getMe',
+      requestUrl: 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getMe',
     }),
   } as never);
 

@@ -32,12 +32,12 @@ function buildClient(getMeImpl: (token?: string) => Promise<unknown>): ZaloHttpC
   };
 }
 
-function buildGetMeResultFixture() {
+function buildOfficialResultFixture() {
   return {
-    id: 123,
-    name: 'LHU Admissions Bot',
-    username: 'lhu_bot',
-    avatar: 'https://example.com/avatar.png',
+    id: '1459232241454765289',
+    account_name: 'bot.VDKyGxQvc',
+    account_type: 'BASIC',
+    can_join_groups: false,
     nonPortableField: 'ignored',
   } as const;
 }
@@ -47,39 +47,122 @@ test('http client receives validated token', async () => {
   const config = buildConfig({ zaloBotToken: 'token-from-config' });
   const client = buildClient(async (token: string) => {
     receivedToken = token;
-    return { ok: true, result: { id: 'bot-1' } };
+    return { ok: true, result: buildOfficialResultFixture() };
   });
 
   const adapter = new ZaloAdapter(config, client);
   const identity = await adapter.getIdentity();
 
   assert.equal(receivedToken, 'token-from-config');
-  assert.equal(identity.id, 'bot-1');
+  assert.equal(identity.id, '1459232241454765289');
 });
 
-test('successful getMe maps to internal identity dto', async () => {
+test('official getMe response maps to internal identity dto', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
-    buildClient(async () => ({ ok: true, result: buildGetMeResultFixture() })),
+    buildClient(async () => ({ ok: true, result: buildOfficialResultFixture() })),
   );
 
   const identity = await adapter.getIdentity();
 
   assert.deepEqual(identity, {
-    id: '123',
-    displayName: 'LHU Admissions Bot',
-    username: 'lhu_bot',
-    avatar: 'https://example.com/avatar.png',
+    id: '1459232241454765289',
+    accountName: 'bot.VDKyGxQvc',
+    accountType: 'BASIC',
+    canJoinGroups: false,
   });
 });
 
-test('malformed successful response with missing id maps to INVALID_RESPONSE', async () => {
+test('missing id maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
     buildClient(async () => ({
       ok: true,
       result: {
-        username: 'missing-id',
+        account_name: 'bot.VDKyGxQvc',
+        account_type: 'BASIC',
+        can_join_groups: false,
+      },
+    })),
+  );
+
+  await assert.rejects(() => adapter.getIdentity(), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('missing account_name maps to INVALID_RESPONSE', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    buildClient(async () => ({
+      ok: true,
+      result: {
+        id: '1459232241454765289',
+        account_type: 'BASIC',
+        can_join_groups: false,
+      },
+    })),
+  );
+
+  await assert.rejects(() => adapter.getIdentity(), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('missing account_type maps to INVALID_RESPONSE', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    buildClient(async () => ({
+      ok: true,
+      result: {
+        id: '1459232241454765289',
+        account_name: 'bot.VDKyGxQvc',
+        can_join_groups: false,
+      },
+    })),
+  );
+
+  await assert.rejects(() => adapter.getIdentity(), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('missing can_join_groups maps to INVALID_RESPONSE', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    buildClient(async () => ({
+      ok: true,
+      result: {
+        id: '1459232241454765289',
+        account_name: 'bot.VDKyGxQvc',
+        account_type: 'BASIC',
+      },
+    })),
+  );
+
+  await assert.rejects(() => adapter.getIdentity(), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('wrong field types map to INVALID_RESPONSE', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    buildClient(async () => ({
+      ok: true,
+      result: {
+        id: 123,
+        account_name: true,
+        account_type: false,
+        can_join_groups: 'no',
       },
     })),
   );
@@ -95,7 +178,7 @@ test('response without ok=true maps to INVALID_RESPONSE', async () => {
   const adapter = new ZaloAdapter(
     buildConfig(),
     buildClient(async () => ({
-      result: buildGetMeResultFixture(),
+      result: buildOfficialResultFixture(),
     })),
   );
 
@@ -111,24 +194,6 @@ test('malformed envelope with missing result maps to INVALID_RESPONSE', async ()
     buildConfig(),
     buildClient(async () => ({
       ok: true,
-    })),
-  );
-
-  await assert.rejects(() => adapter.getIdentity(), (error: unknown) => {
-    assert.ok(error instanceof ZaloIntegrationError);
-    assert.equal(error.status, 'INVALID_RESPONSE');
-    return true;
-  });
-});
-
-test('envelope with missing bot id maps to INVALID_RESPONSE', async () => {
-  const adapter = new ZaloAdapter(
-    buildConfig(),
-    buildClient(async () => ({
-      ok: true,
-      result: {
-        username: 'missing-id',
-      },
     })),
   );
 
@@ -161,7 +226,7 @@ test('raw upstream envelope fields do not leak beyond normalized identity', asyn
     buildConfig(),
     buildClient(async () => ({
       ok: true,
-      result: buildGetMeResultFixture(),
+      result: buildOfficialResultFixture(),
       request_id: 'upstream-request-id',
     })),
   );
@@ -171,15 +236,18 @@ test('raw upstream envelope fields do not leak beyond normalized identity', asyn
   assert.equal(serialized.includes('request_id'), false);
   assert.equal(serialized.includes('ok'), false);
   assert.equal(serialized.includes('nonPortableField'), false);
+  assert.equal(serialized.includes('account_name'), false);
+  assert.equal(serialized.includes('account_type'), false);
+  assert.equal(serialized.includes('can_join_groups'), false);
 });
 
-test('missing token fails safely without sdk call', async () => {
+test('missing token fails safely without http call', async () => {
   let called = false;
   const adapter = new ZaloAdapter(
     buildConfig({ zaloBotToken: '' }),
     buildClient(async () => {
       called = true;
-      return { ok: true, result: { id: 'bot-1' } };
+      return { ok: true, result: buildOfficialResultFixture() };
     }),
   );
 

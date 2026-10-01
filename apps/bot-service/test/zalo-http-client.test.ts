@@ -14,6 +14,8 @@ test('getMe calls official endpoint with token in path', async () => {
   let calledUrl = '';
   let calledMethod = '';
   let calledAccept = '';
+  let calledContentType = '';
+  let calledBody = '';
 
   globalThis.fetch = (async (
     input: Parameters<typeof fetch>[0],
@@ -24,20 +26,39 @@ test('getMe calls official endpoint with token in path', async () => {
     calledAccept = typeof init?.headers === 'object' && init.headers
       ? String((init.headers as Record<string, string>).Accept ?? '')
       : '';
+    calledContentType = typeof init?.headers === 'object' && init.headers
+      ? String((init.headers as Record<string, string>)['Content-Type'] ?? '')
+      : '';
+    calledBody = typeof init?.body === 'string' ? init.body : '';
     return new Response(
       JSON.stringify({
         ok: true,
-        result: { id: 'bot-1' },
+        result: {
+          id: '1459232241454765289',
+          account_name: 'bot.VDKyGxQvc',
+          account_type: 'BASIC',
+          can_join_groups: false,
+        },
       }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     );
   }) as typeof fetch;
 
   const response = await client.getMe('phase4-token');
-  assert.deepEqual(response, { ok: true, result: { id: 'bot-1' } });
-  assert.equal(calledUrl, 'https://bot-api.zapps.me/botphase4-token/getMe');
-  assert.equal(calledMethod, 'GET');
+  assert.deepEqual(response, {
+    ok: true,
+    result: {
+      id: '1459232241454765289',
+      account_name: 'bot.VDKyGxQvc',
+      account_type: 'BASIC',
+      can_join_groups: false,
+    },
+  });
+  assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase4-token/getMe');
+  assert.equal(calledMethod, 'POST');
   assert.equal(calledAccept, 'application/json');
+  assert.equal(calledContentType, 'application/json');
+  assert.equal(calledBody, '{}');
 });
 
 test('getMe maps unsuccessful envelope to API error metadata', async () => {
@@ -59,7 +80,7 @@ test('getMe maps unsuccessful envelope to API error metadata', async () => {
       assert.equal(error.category, 'api_error');
       assert.equal(error.statusCode, 200);
       assert.equal(error.upstreamCode, 401);
-      assert.equal(error.requestUrl, 'https://bot-api.zapps.me/bot[REDACTED]/getMe');
+      assert.equal(error.requestUrl, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getMe');
       return true;
     },
   );
