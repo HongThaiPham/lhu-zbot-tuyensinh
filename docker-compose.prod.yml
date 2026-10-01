@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: ./apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?must set NEXT_PUBLIC_API_BASE_URL}
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?must set NEXT_PUBLIC_API_BASE_URL}
       NODE_ENV: production
@@ -26,7 +28,9 @@ services:
       BOT_SERVICE_ROLE: api
       DATABASE_URL: ${DATABASE_URL:?must set DATABASE_URL}
       NODE_ENV: production
+      PORT: 3001
       REDIS_URL: ${REDIS_URL:?must set REDIS_URL}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?must set APP_ENCRYPTION_KEY}
       ZALO_UPDATE_MODE: webhook
     depends_on:
       postgres:
@@ -50,7 +54,9 @@ services:
       BOT_SERVICE_ROLE: worker
       DATABASE_URL: ${DATABASE_URL:?must set DATABASE_URL}
       NODE_ENV: production
+      PORT: 3001
       REDIS_URL: ${REDIS_URL:?must set REDIS_URL}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?must set APP_ENCRYPTION_KEY}
       ZALO_UPDATE_MODE: webhook
     depends_on:
       postgres:

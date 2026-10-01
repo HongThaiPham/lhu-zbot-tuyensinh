@@ -3,11 +3,13 @@ services:
     build:
       context: .
       dockerfile: ./apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:4201}
     depends_on:
       bot-api:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:${BOT_API_PORT:-4201}}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:4201}
       NODE_ENV: development
     ports:
       - "${ADMIN_PORT:-4100}:3000"
@@ -33,7 +35,9 @@ services:
       BOT_SERVICE_ROLE: api
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/lhu_zbot?schema=public}
       NODE_ENV: development
+      PORT: 3001
       REDIS_URL: redis://redis:6379
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-development-only-app-encryption-key-not-for-production}
       ZALO_UPDATE_MODE: polling
     ports:
       - "${BOT_API_PORT:-4201}:3001"
@@ -59,7 +63,9 @@ services:
       BOT_SERVICE_ROLE: worker
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/lhu_zbot?schema=public}
       NODE_ENV: development
+      PORT: 3001
       REDIS_URL: redis://redis:6379
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-development-only-app-encryption-key-not-for-production}
       ZALO_UPDATE_MODE: polling
     restart: unless-stopped
     user: "1000:1000"

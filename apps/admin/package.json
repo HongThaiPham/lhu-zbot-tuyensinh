@@ -3,14 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "pnpm --filter @lhu/config build && next dev",
+    "build": "pnpm --filter @lhu/config build && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "pnpm --filter @lhu/config build && next lint",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'No tests for admin in Phase 0'"
+    "test": "pnpm --filter @lhu/config build && node --test ./test/**/*.test.mjs"
   },
   "dependencies": {
+    "@lhu/config": "workspace:*",
     "next": "15.5.26",
     "react": "19.1.0",
     "react-dom": "19.1.0"
