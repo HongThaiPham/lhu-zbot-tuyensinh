@@ -1,14 +1,16 @@
 import * as net from 'node:net';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DatabaseHealthProbe, PrismaClientManager } from '@lhu/database';
+import { DatabaseHealthProbe } from '@lhu/database';
 import { loadBotServiceConfig } from '@lhu/config';
+import cookieParser from 'cookie-parser';
+import type { Express } from 'express';
 import { AppModule } from './app.module';
+import { PrismaService } from './prisma/prisma.service';
+import { getTrustProxySetting } from './http/trust-proxy';
 
 const config = loadBotServiceConfig(process.env);
 const ROLE = config.botServiceRole;
-
-const databaseClientManager = new PrismaClientManager();
-const databaseHealthProbe = new DatabaseHealthProbe(databaseClientManager.client);
 
 interface RedisDependencyState {
   readonly host?: string;
@@ -69,27 +71,7 @@ async function getRedisState(): Promise<RedisDependencyState> {
   };
 }
 
-async function getReadinessState() {
-  const database = await databaseHealthProbe.checkReadiness();
-  const redis = await getRedisState();
-
-  return {
-    ready: database.ready && redis.ready,
-    dependencies: {
-      postgres: {
-        ready: database.ready,
-        connectionReady: database.details.connectionReady,
-        schemaReady: database.details.schemaReady,
-        reason: database.details.reason,
-      },
-      redis,
-    },
-  };
-}
-
 async function bootstrap() {
-  await databaseClientManager.connect();
-
   if (ROLE === 'worker') {
     const app = await NestFactory.createApplicationContext(AppModule, {
       logger: false,
@@ -98,7 +80,6 @@ async function bootstrap() {
     const shutdown = async (signal: string) => {
       console.log(`[worker] received ${signal}, shutting down`);
       await app.close();
-      await databaseClientManager.disconnect();
       process.exit(0);
     };
 
@@ -118,6 +99,23 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+  const expressApp = app.getHttpAdapter().getInstance() as Express;
+  expressApp.set('trust proxy', getTrustProxySetting(config.trustProxy));
+  app.use(cookieParser());
+  app.enableCors({
+    origin: config.adminOrigin,
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
+
+  const prismaService = app.get(PrismaService);
+  const databaseHealthProbe = new DatabaseHealthProbe(prismaService.client);
 
   app.getHttpAdapter().get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok', service: 'bot-api' });
@@ -128,7 +126,20 @@ async function bootstrap() {
   });
 
   app.getHttpAdapter().get('/health/ready', async (_req, res) => {
-    const readiness = await getReadinessState();
+    const database = await databaseHealthProbe.checkReadiness();
+    const redis = await getRedisState();
+    const readiness = {
+      ready: database.ready && redis.ready,
+      dependencies: {
+        postgres: {
+          ready: database.ready,
+          connectionReady: database.details.connectionReady,
+          schemaReady: database.details.schemaReady,
+          reason: database.details.reason,
+        },
+        redis,
+      },
+    };
 
     if (!readiness.ready) {
       res.status(503).json({
@@ -149,7 +160,6 @@ async function bootstrap() {
   const shutdown = async (signal: string) => {
     console.log(`[api] received ${signal}, shutting down`);
     await app.close();
-    await databaseClientManager.disconnect();
     process.exit(0);
   };
 
@@ -163,8 +173,7 @@ async function bootstrap() {
   await app.listen(config.port);
 }
 
-bootstrap().catch(async (error) => {
+bootstrap().catch((error) => {
   console.error('Bot service bootstrap failed', error);
-  await databaseClientManager.disconnect();
   process.exit(1);
 });

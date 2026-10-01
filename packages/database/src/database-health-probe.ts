@@ -1,5 +1,7 @@
+import { Prisma } from '@prisma/client';
+
 export interface RawQueryable {
-  $queryRawUnsafe<T>(query: string): Promise<T>;
+  $queryRaw<T>(query: Prisma.Sql): Promise<T>;
 }
 
 export interface DatabaseHealthDetails {
@@ -26,10 +28,10 @@ export class DatabaseHealthProbe {
 
   public async checkReadiness(): Promise<DatabaseHealthResult> {
     try {
-      await this.prismaClient.$queryRawUnsafe('SELECT 1');
+      await this.prismaClient.$queryRaw(Prisma.sql`SELECT 1`);
 
-      const tableRows = await this.prismaClient.$queryRawUnsafe<SchemaTableRow[]>(
-        "SELECT to_regclass('public.system_metadata')::text AS table_name",
+      const tableRows = await this.prismaClient.$queryRaw<SchemaTableRow[]>(
+        Prisma.sql`SELECT to_regclass('public.system_metadata')::text AS table_name`,
       );
 
       const schemaReady = Array.isArray(tableRows) && tableRows[0]?.table_name === 'system_metadata';

@@ -2,7 +2,7 @@ import { loadAdminConfig } from '@lhu/config';
 
 const botApiPort = process.env.BOT_API_PORT?.trim() || '4201';
 const localApiBaseUrlFallback =
-  process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
+  process.env.NODE_ENV !== 'production'
     ? `http://127.0.0.1:${botApiPort}`
     : undefined;
 

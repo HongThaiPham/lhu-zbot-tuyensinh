@@ -33,3 +33,16 @@ pnpm dev
   - `pnpm db:verify:fresh`
 
 See `docs/DATABASE.md` for the full migration, seeding, health, and CI workflow.
+
+## Authentication foundation (Phase 3)
+
+- Auth strategy: opaque session cookie with server-side session records
+- Password hashing: Argon2id
+- RBAC: users/roles/user_roles
+- Audit: append-oriented audit log with transactional writes for important mutations
+- Bootstrap command (explicit only): `pnpm --filter @lhu/bot-service auth:bootstrap-admin`
+
+See:
+
+- `docs/AUTHENTICATION.md`
+- `docs/AUDIT.md`

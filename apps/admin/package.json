@@ -6,7 +6,7 @@
     "dev": "pnpm --filter @lhu/config build && next dev",
     "build": "pnpm --filter @lhu/config build && next build",
     "start": "next start",
-    "lint": "pnpm --filter @lhu/config build && next lint",
+    "lint": "NODE_ENV=development pnpm --filter @lhu/config build && NODE_ENV=development next lint",
     "typecheck": "tsc --noEmit",
     "test": "pnpm --filter @lhu/config build && node --test ./test/**/*.test.mjs"
   },

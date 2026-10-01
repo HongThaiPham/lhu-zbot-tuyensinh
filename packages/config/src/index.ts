@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-export const configVersion = '1.0.0';
+export const configVersion = '1.1.0';
 
 const NODE_ENV_VALUES = ['development', 'test', 'production'] as const;
 const BOT_SERVICE_ROLE_VALUES = ['api', 'worker'] as const;
 const ZALO_UPDATE_MODE_VALUES = ['polling', 'webhook'] as const;
+const COOKIE_SAME_SITE_VALUES = ['lax', 'strict'] as const;
 
 const POSTGRES_PROTOCOLS = new Set(['postgresql:', 'postgres:']);
 const REDIS_PROTOCOLS = new Set(['redis:', 'rediss:']);
@@ -25,6 +26,7 @@ const PRODUCTION_SECRET_PLACEHOLDERS = new Set([
 export type NodeEnv = (typeof NODE_ENV_VALUES)[number];
 export type BotServiceRole = (typeof BOT_SERVICE_ROLE_VALUES)[number];
 export type ZaloUpdateMode = (typeof ZALO_UPDATE_MODE_VALUES)[number];
+export type CookieSameSite = (typeof COOKIE_SAME_SITE_VALUES)[number];
 
 export interface BotServiceConfig {
   readonly nodeEnv: NodeEnv;
@@ -34,11 +36,23 @@ export interface BotServiceConfig {
   readonly zaloUpdateMode: ZaloUpdateMode;
   readonly port: number;
   readonly appEncryptionKey: string;
+  readonly sessionCookieName: string;
+  readonly sessionTtlSeconds: number;
+  readonly adminOrigin: string;
+  readonly sessionCookieSameSite: CookieSameSite;
+  readonly loginRateLimitWindowSeconds: number;
+  readonly loginRateLimitMaxAttempts: number;
+  readonly trustProxy: boolean;
 }
 
 export interface AdminConfig {
   readonly nodeEnv: NodeEnv;
   readonly nextPublicApiBaseUrl: string;
+}
+
+export interface BootstrapAdminConfig {
+  readonly email: string;
+  readonly password: string;
 }
 
 const portSchema = z.coerce.number().int().min(1).max(65535);
@@ -51,11 +65,25 @@ const botServiceEnvSchema = z.object({
   ZALO_UPDATE_MODE: z.enum(ZALO_UPDATE_MODE_VALUES),
   PORT: portSchema.default(3001),
   APP_ENCRYPTION_KEY: z.string().optional(),
+  SESSION_COOKIE_NAME: z.string().trim().min(1).max(128).default('lhu_admin_session'),
+  SESSION_TTL_SECONDS: z.coerce.number().int().min(300).max(2_592_000).default(28_800),
+  SESSION_COOKIE_SAME_SITE: z.enum(COOKIE_SAME_SITE_VALUES).default('lax'),
+  ADMIN_ORIGIN: z.string().url().optional(),
+  LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(10).max(3600).default(300),
+  LOGIN_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
+  TRUST_PROXY: z.enum(['true', 'false']).default('false'),
 });
 
 const adminEnvSchema = z.object({
   NODE_ENV: z.enum(NODE_ENV_VALUES),
   NEXT_PUBLIC_API_BASE_URL: z.string().url(),
+});
+
+const bootstrapAdminEnvSchema = z.object({
+  ADMIN_BOOTSTRAP_EMAIL: z.string().email(),
+  ADMIN_BOOTSTRAP_PASSWORD: z.string().min(12).max(256).regex(/^\S+$/, {
+    message: 'ADMIN_BOOTSTRAP_PASSWORD: invalid value',
+  }),
 });
 
 export class ConfigValidationError extends Error {
@@ -152,6 +180,12 @@ export function loadBotServiceConfig(
     additionalIssues.push(redisUrlIssue);
   }
 
+  const adminOrigin = parsed.data.ADMIN_ORIGIN?.trim() || 'http://127.0.0.1:4100';
+  const adminOriginIssue = parseUrl(adminOrigin, 'ADMIN_ORIGIN', WEB_PROTOCOLS);
+  if (adminOriginIssue) {
+    additionalIssues.push(adminOriginIssue);
+  }
+
   if (parsed.data.NODE_ENV === 'production') {
     additionalIssues.push(...validateProductionSecret(parsed.data.APP_ENCRYPTION_KEY, 'APP_ENCRYPTION_KEY'));
   }
@@ -172,6 +206,13 @@ export function loadBotServiceConfig(
     zaloUpdateMode: parsed.data.ZALO_UPDATE_MODE,
     port: parsed.data.PORT,
     appEncryptionKey: normalizedKey,
+    sessionCookieName: parsed.data.SESSION_COOKIE_NAME,
+    sessionTtlSeconds: parsed.data.SESSION_TTL_SECONDS,
+    sessionCookieSameSite: parsed.data.SESSION_COOKIE_SAME_SITE,
+    adminOrigin,
+    loginRateLimitWindowSeconds: parsed.data.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+    loginRateLimitMaxAttempts: parsed.data.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
+    trustProxy: parsed.data.TRUST_PROXY === 'true',
   });
 }
 
@@ -196,5 +237,19 @@ export function loadAdminConfig(rawEnv: Readonly<Record<string, string | undefin
   return Object.freeze({
     nodeEnv: parsed.data.NODE_ENV,
     nextPublicApiBaseUrl,
+  });
+}
+
+export function loadBootstrapAdminConfig(
+  rawEnv: Readonly<Record<string, string | undefined>>,
+): BootstrapAdminConfig {
+  const parsed = bootstrapAdminEnvSchema.safeParse(rawEnv);
+  if (!parsed.success) {
+    throw new ConfigValidationError(toIssues(parsed.error));
+  }
+
+  return Object.freeze({
+    email: parsed.data.ADMIN_BOOTSTRAP_EMAIL.trim(),
+    password: parsed.data.ADMIN_BOOTSTRAP_PASSWORD,
   });
 }
