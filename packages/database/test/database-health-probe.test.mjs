@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Prisma } from '@prisma/client';
 import { DatabaseHealthProbe } from '../dist/index.js';
 
 function toSqlString(query) {

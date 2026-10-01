@@ -8,6 +8,7 @@ import { REQUEST_USER_KEY } from './constants';
 import { AuthService } from './auth.service';
 
 interface RequestWithAuth extends Request {
+  [key: string]: unknown;
   authUser?: unknown;
 }
 
@@ -20,7 +21,7 @@ export class SessionAuthGuard implements CanActivate {
     const token = request.cookies?.[this.authService.getCookieName()] as string | undefined;
 
     const user = await this.authService.authenticateSession(token);
-    (request as Record<string, unknown>)[REQUEST_USER_KEY] = user;
+    request[REQUEST_USER_KEY] = user;
     request.authUser = user;
     return true;
   }

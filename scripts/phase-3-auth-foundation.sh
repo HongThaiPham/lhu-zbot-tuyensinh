@@ -115,7 +115,7 @@ LIMITED_EMAIL="$LIMITED_EMAIL" \
 LIMITED_PASSWORD="$LIMITED_PASSWORD" \
 TARGET_EMAIL="$TARGET_EMAIL" \
 TARGET_PASSWORD="$TARGET_PASSWORD" \
-node <<'NODE'
+pnpm --filter @lhu/bot-service exec node <<'NODE'
 const { PrismaClient } = require('@prisma/client');
 const argon2 = require('argon2');
 
@@ -162,7 +162,7 @@ NODE
 IDENTIFIERS=$(DATABASE_URL="$DATABASE_URL_VALUE" \
 LIMITED_EMAIL="$LIMITED_EMAIL" LIMITED_PASSWORD="$LIMITED_PASSWORD" \
 TARGET_EMAIL="$TARGET_EMAIL" TARGET_PASSWORD="$TARGET_PASSWORD" \
-node <<'NODE'
+pnpm --filter @lhu/bot-service exec node <<'NODE'
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -252,7 +252,7 @@ ADMIN_MUTATION_STATUS=$(curl -sS -o /tmp/phase3-auth-body.txt -w '%{http_code}' 
   --data '{"active":false}')
 assert_status 200 "$ADMIN_MUTATION_STATUS" "Admin mutation should succeed"
 
-DATABASE_URL="$DATABASE_URL_VALUE" ADMIN_ID="$ADMIN_ID" TARGET_ID="$TARGET_ID" node <<'NODE'
+DATABASE_URL="$DATABASE_URL_VALUE" ADMIN_ID="$ADMIN_ID" TARGET_ID="$TARGET_ID" pnpm --filter @lhu/bot-service exec node <<'NODE'
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();

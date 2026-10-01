@@ -1,8 +1,9 @@
-import { Injectable, TooManyRequestsException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 
 interface AttemptEntry {
   readonly expiresAt: number;
   readonly count: number;
+  readonly limit: number;
 }
 
 @Injectable()
@@ -12,38 +13,25 @@ export class LoginAbuseService {
   public checkAllowed(key: string, now = Date.now()): void {
     this.prune(now);
     const entry = this.attempts.get(key);
-    if (!entry) {
+    if (!entry || entry.expiresAt < now) {
       return;
     }
 
-    throw new TooManyRequestsException('Too many login attempts. Please try again later.');
+    if (entry.count >= entry.limit) {
+      throw new HttpException('Too many login attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
   }
 
   public recordFailure(key: string, windowSeconds: number, maxAttempts: number, now = Date.now()): void {
-    const entry = this.attempts.get(key);
+    const entry = this.attempts.get(key) ?? null;
     const expiresAt = now + windowSeconds * 1000;
-
-    if (!entry || entry.expiresAt < now) {
-      if (maxAttempts <= 1) {
-        this.attempts.set(key, { count: 1, expiresAt });
-      } else {
-        this.attempts.delete(key);
-      }
-      return;
-    }
-
-    const nextCount = entry.count + 1;
-    if (nextCount >= maxAttempts) {
-      this.attempts.set(key, {
-        count: nextCount,
-        expiresAt,
-      });
-      return;
-    }
+    const currentCount = !entry || entry.expiresAt < now ? 0 : entry.count;
+    const nextCount = currentCount + 1;
 
     this.attempts.set(key, {
       count: nextCount,
       expiresAt,
+      limit: maxAttempts,
     });
   }
 
