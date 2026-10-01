@@ -57,3 +57,11 @@ See:
 See:
 
 - `docs/ZALO_INTEGRATION.md`
+
+## Zalo getUpdates long polling foundation (Phase 5)
+
+- Implemented API: `POST /bot<BOT_TOKEN>/getUpdates`
+- Polling owner: `bot-worker` only
+- Mode gating: polling runs only when `ZALO_UPDATE_MODE=polling`
+- `bot-api` health endpoints remain free of live Zalo dependency
+- Verification script: `./scripts/phase-5-zalo-polling-foundation.sh`

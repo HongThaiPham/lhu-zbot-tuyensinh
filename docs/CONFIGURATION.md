@@ -25,6 +25,7 @@
 - `REDIS_URL` (`redis://` or `rediss://`) — required
 - `BOT_SERVICE_ROLE` (`api | worker`) — required
 - `ZALO_UPDATE_MODE` (`polling | webhook`) — required
+- `ZALO_POLL_TIMEOUT_SECONDS` (integer, `1-300`, default `30`) — long-poll timeout passed to Zalo `getUpdates`
 - `ZALO_BOT_TOKEN` — required in production, optional in development/test for deterministic mock-based tests
 - `PORT` (TCP port 1-65535) — optional, defaults to `3001`
 - `APP_ENCRYPTION_KEY` — required in production
@@ -53,6 +54,9 @@
 ## Docker Compose usage
 
 - `docker-compose.yml` (development) provides safe local defaults.
+  - `bot-api` default mode: `ZALO_API_UPDATE_MODE=webhook`
+  - `bot-worker` default mode: `ZALO_WORKER_UPDATE_MODE=polling`
+  - polling mode requires `bot-worker` replicas = `1` for a single bot token consumer
 - `docker-compose.prod.yml` requires explicit production-sensitive values, including `APP_ENCRYPTION_KEY`.
 - `docker-compose.prod.yml` requires explicit `ZALO_BOT_TOKEN`.
 - PostgreSQL and Redis remain internal-only in production topology (no public host port mapping).
@@ -63,6 +67,7 @@ On invalid configuration, startup fails immediately with a safe error format:
 
 - `APP_ENCRYPTION_KEY: required in production`
 - `ZALO_BOT_TOKEN: required in production`
+- `ZALO_POLL_TIMEOUT_SECONDS: invalid value`
 - `BOT_SERVICE_ROLE: invalid value`
 
 Values are never included in error messages.

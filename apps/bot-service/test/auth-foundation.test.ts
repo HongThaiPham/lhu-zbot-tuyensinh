@@ -59,6 +59,7 @@ function buildAuthService(
       loginRateLimitWindowSeconds: 300,
       loginRateLimitMaxAttempts: 5,
       trustProxy: false,
+      zaloPollTimeoutSeconds: 30,
       ...configOverrides,
     },
     prisma as never,

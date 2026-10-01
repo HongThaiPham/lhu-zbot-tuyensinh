@@ -1,4 +1,4 @@
-# Zalo Integration (Phase 4)
+# Zalo Integration (Phase 5)
 
 ## References consulted
 
@@ -16,11 +16,11 @@
   - `https://docs.zaloplatforms.com/docs/BOT/apis/sendSticker`
   - `https://docs.zaloplatforms.com/docs/BOT/apis/sendChatAction`
   - `https://docs.zaloplatforms.com/docs/BOT/apis/sendVoice`
-- Note: these endpoints were DNS-unreachable from this sandbox runtime during verification, so implementation remains constrained to documented Phase 4 behavior and mocked transport tests.
+- Note: these endpoints were DNS-unreachable from this sandbox runtime during verification, so implementation remains constrained to documented Phase 5 behavior and mocked transport tests.
 
 ## Architecture boundary
 
-Phase 4 permanently uses direct official REST integration (no third-party SDK):
+Phases 4-5 use direct official REST integration (no third-party SDK):
 
 `AdminZaloController -> AdminZaloService -> ZaloService -> ZaloAdapter -> OfficialZaloHttpClient -> Zalo Bot REST API`
 
@@ -34,16 +34,24 @@ Phase 4 permanently uses direct official REST integration (no third-party SDK):
 
 - `ZALO_BOT_TOKEN` is required in production and optional in development/test.
 - Token values are never returned in API payloads, logs, or config validation messages.
-- `ZALO_UPDATE_MODE` stays unchanged (`polling`/`webhook`) for future phases.
+- `ZALO_UPDATE_MODE` controls mutually exclusive runtime mode (`polling`/`webhook`).
+- `ZALO_POLL_TIMEOUT_SECONDS` controls Zalo long-poll timeout for `getUpdates`.
 
-## HTTP transport contract (Phase 4)
+## HTTP transport contract (Phases 4-5)
 
 - Base URL: `https://bot-api.zaloplatforms.com`
 - Tokenized endpoint pattern: `/bot{token}/{method}`
-- Implemented method in Phase 4: `getMe` only
+- Implemented methods:
+  - `getMe` (Phase 4)
+  - `getUpdates` (Phase 5)
 - Method: `POST /bot<BOT_TOKEN>/getMe` (empty JSON object body)
+- Method: `POST /bot<BOT_TOKEN>/getUpdates` (JSON body includes optional `timeout`)
 - Request timeout: 5 seconds
+- Polling timeout model:
+  - Zalo long-poll timeout uses `ZALO_POLL_TIMEOUT_SECONDS` (default `30`).
+  - Local HTTP abort timeout is `ZALO_POLL_TIMEOUT_SECONDS + 5 seconds` safety margin.
 - Response expectation for `getMe`: JSON envelope with `ok` boolean and `result` object
+- Response expectation for `getUpdates`: JSON envelope with `ok` boolean and runtime-validated `result`
 - Unsuccessful envelope (`ok !== true`) is normalized to safe error categories without leaking token
 
 ## getMe identity normalization
@@ -69,7 +77,14 @@ Connection testing performs one bounded `getMe` request and returns:
 - `UPSTREAM_ERROR`
 - `INVALID_RESPONSE`
 
-No polling loop or webhook processing is implemented in Phase 4.
+## Polling loop behavior (Phase 5)
+
+- Runs only in `bot-worker` and only when `ZALO_UPDATE_MODE=polling`
+- Does not run in `bot-api`
+- Uses a sequential async loop with no overlapping polls
+- Uses bounded exponential backoff (`1s -> 2s -> 4s -> 8s -> 16s -> 30s` max) and resets after successful polls
+- Graceful shutdown aborts in-flight long poll and prevents starting another poll
+- Polling/webhook coexistence is not attempted; non-retryable polling failures emit safe operator guidance to remove webhook or switch to webhook mode
 
 ## Error handling and redaction
 
@@ -89,6 +104,19 @@ No polling loop or webhook processing is implemented in Phase 4.
 - `/health/live` and `/health/ready` do not perform live Zalo API calls.
 - Zalo external connectivity is tested explicitly via admin endpoint or optional script.
 
+## Event validation + normalization boundary (Phase 5)
+
+`getUpdates -> raw unknown payload -> ZaloUpdateValidator -> ZaloUpdateNormalizer -> internal ZaloInboundEvent -> processor`
+
+- Supported event names:
+  - `message.text.received`
+  - `message.image.received`
+  - `message.sticker.received`
+  - `message.voice.received`
+  - `message.unsupported.received`
+- Unknown event names do not crash the worker; they are normalized as unsupported metadata events.
+- Normalized events include metadata only and do not leak raw payload fields.
+
 ## Manual live test command
 
 ```bash
@@ -99,8 +127,7 @@ Requires `ZALO_BOT_TOKEN`; outputs only normalized safe result.
 
 ## Planned APIs by later phases
 
-- Phase 5 plan: `getUpdates` polling flow
 - Phase 6 plan: `setWebhook`, `testWebhook`, `deleteWebhook`, `getWebhookInfo`, webhook receiver
 - Phase 7 plan: `sendMessage`, `sendPhoto`, `sendSticker`, `sendChatAction`, `sendVoice`
 
-These are documented targets only in this phase; not implemented here.
+These remain planned only and are not implemented in Phases 4-5.

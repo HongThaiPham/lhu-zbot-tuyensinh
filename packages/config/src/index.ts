@@ -44,6 +44,7 @@ export interface BotServiceConfig {
   readonly loginRateLimitWindowSeconds: number;
   readonly loginRateLimitMaxAttempts: number;
   readonly trustProxy: boolean;
+  readonly zaloPollTimeoutSeconds: number;
 }
 
 export interface AdminConfig {
@@ -74,6 +75,7 @@ const botServiceEnvSchema = z.object({
   LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(10).max(3600).default(300),
   LOGIN_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
+  ZALO_POLL_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(300).default(30),
 });
 
 const adminEnvSchema = z.object({
@@ -226,6 +228,7 @@ export function loadBotServiceConfig(
     loginRateLimitWindowSeconds: parsed.data.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
     loginRateLimitMaxAttempts: parsed.data.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
     trustProxy: parsed.data.TRUST_PROXY === 'true',
+    zaloPollTimeoutSeconds: parsed.data.ZALO_POLL_TIMEOUT_SECONDS,
   });
 }
 

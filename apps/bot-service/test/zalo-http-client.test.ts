@@ -121,3 +121,93 @@ test('getMe maps malformed json envelope on 2xx to invalid_response category', a
     },
   );
 });
+
+test('getUpdates calls official endpoint with timeout payload', async () => {
+  const client = new OfficialZaloHttpClient();
+  let calledUrl = '';
+  let calledMethod = '';
+  let calledBody = '';
+
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    calledUrl = typeof input === 'string' ? input : input.toString();
+    calledMethod = init?.method ?? '';
+    calledBody = typeof init?.body === 'string' ? init.body : '';
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        result: [],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }) as typeof fetch;
+
+  const response = await client.getUpdates('phase5-token', { timeoutSeconds: 30 });
+  assert.deepEqual(response, { ok: true, result: [] });
+  assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase5-token/getUpdates');
+  assert.equal(calledMethod, 'POST');
+  assert.equal(calledBody, JSON.stringify({ timeout: 30 }));
+});
+
+test('getUpdates abort signal cancellation maps to timeout without token leak', async () => {
+  const client = new OfficialZaloHttpClient();
+  const controller = new AbortController();
+
+  globalThis.fetch = (async (): Promise<Response> => {
+    controller.abort();
+    throw new DOMException('aborted', 'AbortError');
+  }) as typeof fetch;
+
+  await assert.rejects(
+    async () =>
+      client.getUpdates('phase5-token', {
+        timeoutSeconds: 30,
+        signal: controller.signal,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof ZaloApiRequestError);
+      assert.equal(error.category, 'timeout');
+      assert.equal(error.requestUrl, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getUpdates');
+      return true;
+    },
+  );
+});
+
+test('getUpdates local timeout cancellation maps to timeout without token leak', async () => {
+  const client = new OfficialZaloHttpClient();
+  const originalSetTimeout = globalThis.setTimeout;
+
+  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], _timeout?: number, ...args: unknown[]) => {
+    const callback = typeof handler === 'function' ? handler : () => undefined;
+    callback(...args);
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+
+  globalThis.fetch = (async (
+    _input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    const signal = init?.signal;
+    if (signal?.aborted) {
+      throw new DOMException('aborted', 'AbortError');
+    }
+
+    return await new Promise<Response>(() => undefined);
+  }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      async () => client.getUpdates('phase5-token', { timeoutSeconds: 30 }),
+      (error: unknown) => {
+        assert.ok(error instanceof ZaloApiRequestError);
+        assert.equal(error.category, 'timeout');
+        assert.equal(error.requestUrl, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getUpdates');
+        return true;
+      },
+    );
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
+});

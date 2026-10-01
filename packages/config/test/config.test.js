@@ -25,6 +25,7 @@ function buildBotEnv(overrides = {}) {
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: '300',
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: '5',
     TRUST_PROXY: 'false',
+    ZALO_POLL_TIMEOUT_SECONDS: '30',
     ...overrides,
   };
 }
@@ -53,6 +54,7 @@ test('valid development bot config parses', () => {
   assert.equal(config.zaloBotToken, 'development-zalo-token-placeholder');
   assert.equal(config.sessionCookieName, 'lhu_admin_session');
   assert.equal(config.trustProxy, false);
+  assert.equal(config.zaloPollTimeoutSeconds, 30);
 });
 
 test('development config can omit zalo token for deterministic tests', () => {
@@ -148,6 +150,13 @@ test('invalid session ttl fails', () => {
   assertConfigError(
     () => loadBotServiceConfig(buildBotEnv({ SESSION_TTL_SECONDS: '10' })),
     'SESSION_TTL_SECONDS: invalid value',
+  );
+});
+
+test('invalid poll timeout fails', () => {
+  assertConfigError(
+    () => loadBotServiceConfig(buildBotEnv({ ZALO_POLL_TIMEOUT_SECONDS: '0' })),
+    'ZALO_POLL_TIMEOUT_SECONDS: invalid value',
   );
 });
 

@@ -25,6 +25,15 @@
   - session auth + ADMIN RBAC + CSRF/origin guard
 - Runtime readiness remains internal dependency based (PostgreSQL/Redis); no live Zalo call in `/health/ready`.
 
+## Zalo polling transport foundation (Phase 5)
+
+- `getUpdates` long-polling executes only in `bot-worker` when `ZALO_UPDATE_MODE=polling`.
+- `bot-api` does not start polling loops.
+- Polling loop is sequential and uses bounded retry backoff with graceful shutdown cancellation.
+- In polling mode, run `bot-worker` with a single replica per bot token.
+- Polling output is normalized via:
+  - `ZaloUpdateValidator` -> `ZaloUpdateNormalizer` -> internal `ZaloInboundEvent` -> processor boundary.
+
 ## Authentication and authorization (Phase 3)
 
 - Strategy: server-issued opaque session cookie with server-side session persistence in PostgreSQL.

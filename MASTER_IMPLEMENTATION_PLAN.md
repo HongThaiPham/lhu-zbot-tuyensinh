@@ -222,7 +222,7 @@ Before coding, read current official Zalo Bot docs for API calling and `getMe`. 
 
 ## Phase 5 — Development Polling Mode
 
-Implement documented official `getUpdates` polling flow, dispatcher, `/start`, `/help`, text/unknown handlers, graceful shutdown and mutual exclusion with webhook mode.
+Implement documented official `getUpdates` polling transport flow, runtime update validation/normalization, graceful shutdown and mutual exclusion with webhook mode. Dispatcher/business handlers continue in subsequent phases.
 
 ## Phase 6 — Production Webhook
 

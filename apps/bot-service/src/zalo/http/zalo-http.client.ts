@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ZALO_API_BASE_URL, ZALO_CONNECTION_TIMEOUT_MS } from '../zalo.constants';
+import {
+  ZALO_API_BASE_URL,
+  ZALO_CONNECTION_TIMEOUT_MS,
+  ZALO_POLL_HTTP_TIMEOUT_MARGIN_MS,
+} from '../zalo.constants';
 import { ZaloApiRequestError, sanitizeZaloUrl } from '../zalo.errors';
-import type { ZaloHttpClient } from './zalo-http.types';
+import type { GetUpdatesRequestOptions, ZaloHttpClient } from './zalo-http.types';
 
 interface ZaloApiEnvelope {
   readonly ok: boolean;
@@ -15,19 +19,38 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
     return this.callApi(token, 'getMe', {
       method: 'POST',
       body: {},
+      timeoutMs: ZALO_CONNECTION_TIMEOUT_MS,
+    });
+  }
+
+  public async getUpdates(token: string, options: GetUpdatesRequestOptions): Promise<unknown> {
+    const timeoutSeconds = Math.max(1, Math.floor(options.timeoutSeconds));
+    return this.callApi(token, 'getUpdates', {
+      method: 'POST',
+      body: { timeout: timeoutSeconds },
+      timeoutMs: (timeoutSeconds * 1_000) + ZALO_POLL_HTTP_TIMEOUT_MARGIN_MS,
+      signal: options.signal,
     });
   }
 
   private async callApi(
     token: string,
     functionName: string,
-    request: { readonly method: 'GET' | 'POST'; readonly body?: Record<string, unknown> },
+    request: {
+      readonly method: 'GET' | 'POST';
+      readonly body?: Record<string, unknown>;
+      readonly timeoutMs: number;
+      readonly signal?: AbortSignal;
+    },
   ): Promise<ZaloApiEnvelope> {
     const url = `${ZALO_API_BASE_URL}/bot${token}/${functionName}`;
     const requestUrl = sanitizeZaloUrl(url, token);
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ZALO_CONNECTION_TIMEOUT_MS);
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => timeoutController.abort(), request.timeoutMs);
+    const signal = request.signal
+      ? AbortSignal.any([timeoutController.signal, request.signal])
+      : timeoutController.signal;
     try {
       const response = await fetch(url, {
         method: request.method,
@@ -36,7 +59,7 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
           ...(request.method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
         },
         ...(request.method === 'POST' ? { body: JSON.stringify(request.body ?? {}) } : {}),
-        signal: controller.signal,
+        signal,
       });
 
       if (!response.ok) {
