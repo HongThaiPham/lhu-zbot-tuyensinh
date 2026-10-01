@@ -4,8 +4,10 @@ import { NestFactory } from '@nestjs/core';
 import { DatabaseHealthProbe } from '@lhu/database';
 import { loadBotServiceConfig } from '@lhu/config';
 import cookieParser from 'cookie-parser';
+import type { Express } from 'express';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
+import { getTrustProxySetting } from './http/trust-proxy';
 
 const config = loadBotServiceConfig(process.env);
 const ROLE = config.botServiceRole;
@@ -97,6 +99,8 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+  const expressApp = app.getHttpAdapter().getInstance() as Express;
+  expressApp.set('trust proxy', getTrustProxySetting(config.trustProxy));
   app.use(cookieParser());
   app.enableCors({
     origin: config.adminOrigin,

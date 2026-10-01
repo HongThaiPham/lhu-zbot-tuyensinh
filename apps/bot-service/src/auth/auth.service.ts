@@ -20,6 +20,7 @@ interface LoginContext {
 const AUTH_FAILURE_MESSAGE = 'Invalid credentials';
 const DUMMY_PASSWORD_HASH =
   '$argon2id$v=19$m=19456,t=2,p=1$q166RlgDIyTzmQ/L+CGeuA$OJEyQYAY3XMbTwUb3G2VyH4mG86kTzV5n6+uDsJ8wrs';
+const SESSION_TOUCH_MIN_INTERVAL_MS = 5 * 60 * 1000;
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -110,7 +111,6 @@ export class AuthService {
       throw new UnauthorizedException(AUTH_FAILURE_MESSAGE);
     }
 
-    this.loginAbuseService.clear(ipKey);
     this.loginAbuseService.clear(identityKey);
 
     const token = this.sessionService.createToken();
@@ -173,7 +173,12 @@ export class AuthService {
       throw new UnauthorizedException('Authentication required');
     }
 
-    await this.sessionService.touchSession(session.id);
+    const shouldTouchSession =
+      !session.lastUsedAt || now.getTime() - session.lastUsedAt.getTime() >= SESSION_TOUCH_MIN_INTERVAL_MS;
+
+    if (shouldTouchSession) {
+      await this.sessionService.touchSession(session.id);
+    }
 
     return {
       id: session.user.id,
@@ -193,18 +198,9 @@ export class AuthService {
     };
   }
 
-  public getClientIp(forwardedForHeader: string | string[] | undefined, remoteAddress: string | undefined): string {
-    if (this.config.trustProxy) {
-      if (typeof forwardedForHeader === 'string' && forwardedForHeader.trim().length > 0) {
-        return forwardedForHeader.split(',')[0]?.trim() || 'unknown';
-      }
-
-      if (Array.isArray(forwardedForHeader) && forwardedForHeader.length > 0) {
-        const candidate = forwardedForHeader[0];
-        if (candidate && candidate.trim().length > 0) {
-          return candidate.trim();
-        }
-      }
+  public getClientIp(requestIp: string | undefined, remoteAddress: string | undefined): string {
+    if (typeof requestIp === 'string' && requestIp.trim().length > 0) {
+      return requestIp;
     }
 
     return remoteAddress || 'unknown';

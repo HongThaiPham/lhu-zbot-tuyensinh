@@ -33,7 +33,7 @@
 - `ADMIN_ORIGIN` — allowed admin browser origin for authenticated state-changing requests (default in local: `http://127.0.0.1:4100`)
 - `LOGIN_RATE_LIMIT_WINDOW_SECONDS` — login failure throttle window (default: `300`)
 - `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` — max failed attempts in window before temporary block (default: `5`)
-- `TRUST_PROXY` (`true | false`) — whether to trust `X-Forwarded-For` for client IP extraction (default: `false`)
+- `TRUST_PROXY` (`true | false`) — enables framework trusted-proxy mode for one reverse-proxy hop (`app.set('trust proxy', 1)`); default `false`
 - `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` — only used by explicit bootstrap command
 
 ### Admin
@@ -68,6 +68,12 @@ Bootstrap command (`auth:bootstrap-admin`) also uses safe validation that report
 ## Environment precedence
 
 Environment values are read from process environment at startup and validated once. Compose-provided values override file defaults as normal Docker Compose behavior.
+
+## TRUST_PROXY topology expectation
+
+- Default `TRUST_PROXY=false` is safe for direct app exposure and ignores untrusted forwarding headers.
+- `TRUST_PROXY=true` is intended for a single controlled reverse proxy directly in front of bot-service.
+- The edge proxy must overwrite (not append user-controlled) forwarding headers before requests reach the app.
 
 ## Adding future variables
 

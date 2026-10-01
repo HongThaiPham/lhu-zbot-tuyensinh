@@ -29,7 +29,7 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const ipAddress = this.authService.getClientIp(request.headers['x-forwarded-for'], request.socket.remoteAddress);
+    const ipAddress = this.authService.getClientIp(request.ip, request.socket.remoteAddress);
 
     const result = await this.authService.login(loginDto.email, loginDto.password, {
       ipAddress,

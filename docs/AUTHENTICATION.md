@@ -60,7 +60,16 @@ Cross-origin mutation requests are rejected.
 ## Login abuse control
 
 Phase 3 applies bounded in-memory throttling for login failures per IP and per normalized identity.
+Successful authentication clears the normalized identity bucket only and does not clear shared IP failure history.
 This is deterministic for single-instance runtime and documented as a non-distributed limitation for multi-replica production.
+
+## Client IP derivation
+
+Client address uses framework-native `req.ip` semantics. When `TRUST_PROXY=true`, Nest/Express is configured with single-hop trusted proxy mode (`trust proxy = 1`) and expects one controlled edge proxy that overwrites forwarding headers.
+
+## Session activity writes
+
+`lastUsedAt` updates are throttled (5-minute minimum interval) to avoid write amplification on every authenticated request.
 
 ## Bootstrap procedure
 

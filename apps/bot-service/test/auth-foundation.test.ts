@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { UnauthorizedException } from '@nestjs/common';
+import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import type { UserStatus } from '@prisma/client';
 import { PasswordService } from '../src/auth/password.service';
 import { SessionService } from '../src/auth/session.service';
 import { LoginAbuseService } from '../src/auth/login-abuse.service';
@@ -16,7 +17,13 @@ process.env.SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'lhu_admin_
 process.env.SESSION_TTL_SECONDS = process.env.SESSION_TTL_SECONDS || '1200';
 process.env.ADMIN_ORIGIN = process.env.ADMIN_ORIGIN || 'http://127.0.0.1:4100';
 
-function buildAuthService(overrides: Partial<Record<string, unknown>> = {}) {
+function buildAuthService(
+  overrides: Partial<Record<string, unknown>> = {},
+  configOverrides: Partial<{
+    loginRateLimitWindowSeconds: number;
+    loginRateLimitMaxAttempts: number;
+  }> = {},
+) {
   const passwordService = new PasswordService();
   const loginAbuseService = new LoginAbuseService();
 
@@ -52,6 +59,7 @@ function buildAuthService(overrides: Partial<Record<string, unknown>> = {}) {
       loginRateLimitWindowSeconds: 300,
       loginRateLimitMaxAttempts: 5,
       trustProxy: false,
+      ...configOverrides,
     },
     prisma as never,
     passwordService,
@@ -65,6 +73,17 @@ function buildAuthService(overrides: Partial<Record<string, unknown>> = {}) {
     sessionService,
     loginAbuseService,
   };
+}
+
+async function assertRejectsWithStatus(run: () => Promise<unknown>, expectedStatus: number): Promise<void> {
+  await assert.rejects(run, (error: unknown) => {
+    if (!(error instanceof HttpException)) {
+      return false;
+    }
+
+    assert.equal(error.getStatus(), expectedStatus);
+    return true;
+  });
 }
 
 test('password hashing never stores plaintext and verifies valid credentials', async () => {
@@ -123,6 +142,137 @@ test('login abuse limiter blocks repeated failures in bounded window', () => {
   assert.throws(() => limiter.checkAllowed(key, now + 3));
 });
 
+test('login keeps IP failure bucket across successful logins and still reaches 429', async () => {
+  const users = new Map<
+    string,
+    {
+      id: string;
+      email: string;
+      normalizedEmail: string;
+      passwordHash: string;
+      status: UserStatus;
+      roles: Array<{ role: { name: 'ADMIN' } }>;
+    }
+  >();
+
+  const { passwordService, authService } = buildAuthService(
+    {
+      user: {
+        findUnique: async ({ where }: { where: { normalizedEmail: string } }) => users.get(where.normalizedEmail) ?? null,
+        update: async ({ where }: { where: { id: string } }) => ({ id: where.id }),
+      },
+      session: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({ id: 'session-1', ...data }),
+        updateMany: async () => ({ count: 1 }),
+        findUnique: async () => null,
+        update: async () => ({ id: 'session-1' }),
+      },
+    },
+    { loginRateLimitMaxAttempts: 3 },
+  );
+
+  const attackerPassword = 'AttackerStrongPass!123';
+  users.set('attacker@example.com', {
+    id: 'attacker-1',
+    email: 'attacker@example.com',
+    normalizedEmail: 'attacker@example.com',
+    passwordHash: await passwordService.hashPassword(attackerPassword),
+    status: 'ACTIVE',
+    roles: [{ role: { name: 'ADMIN' } }],
+  });
+
+  const victimEmail = 'victim@example.com';
+  const sharedIp = '203.0.113.20';
+
+  await assertRejectsWithStatus(
+    () => authService.login(victimEmail, 'wrong-password', { ipAddress: sharedIp }),
+    HttpStatus.UNAUTHORIZED,
+  );
+  await assertRejectsWithStatus(
+    () => authService.login(victimEmail, 'wrong-password', { ipAddress: sharedIp }),
+    HttpStatus.UNAUTHORIZED,
+  );
+
+  await authService.login('attacker@example.com', attackerPassword, { ipAddress: sharedIp });
+
+  await assertRejectsWithStatus(
+    () => authService.login(victimEmail, 'wrong-password', { ipAddress: sharedIp }),
+    HttpStatus.UNAUTHORIZED,
+  );
+  await assertRejectsWithStatus(
+    () => authService.login(victimEmail, 'wrong-password', { ipAddress: sharedIp }),
+    HttpStatus.TOO_MANY_REQUESTS,
+  );
+});
+
+test('successful login intentionally clears identity bucket while IP handling remains independent', async () => {
+  const users = new Map<
+    string,
+    {
+      id: string;
+      email: string;
+      normalizedEmail: string;
+      passwordHash: string;
+      status: UserStatus;
+      roles: Array<{ role: { name: 'ADMIN' } }>;
+    }
+  >();
+
+  const { passwordService, authService } = buildAuthService(
+    {
+      user: {
+        findUnique: async ({ where }: { where: { normalizedEmail: string } }) => users.get(where.normalizedEmail) ?? null,
+        update: async ({ where }: { where: { id: string } }) => ({ id: where.id }),
+      },
+      session: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({ id: 'session-2', ...data }),
+        updateMany: async () => ({ count: 1 }),
+        findUnique: async () => null,
+        update: async () => ({ id: 'session-2' }),
+      },
+    },
+    { loginRateLimitMaxAttempts: 3 },
+  );
+
+  const adminPassword = 'AdminStrongPass!123';
+  users.set('admin@example.com', {
+    id: 'admin-1',
+    email: 'admin@example.com',
+    normalizedEmail: 'admin@example.com',
+    passwordHash: await passwordService.hashPassword(adminPassword),
+    status: 'ACTIVE',
+    roles: [{ role: { name: 'ADMIN' } }],
+  });
+
+  await assertRejectsWithStatus(
+    () => authService.login('admin@example.com', 'wrong-password', { ipAddress: '198.51.100.11' }),
+    HttpStatus.UNAUTHORIZED,
+  );
+  await assertRejectsWithStatus(
+    () => authService.login('admin@example.com', 'wrong-password', { ipAddress: '198.51.100.12' }),
+    HttpStatus.UNAUTHORIZED,
+  );
+
+  await authService.login('admin@example.com', adminPassword, { ipAddress: '198.51.100.13' });
+
+  await assertRejectsWithStatus(
+    () => authService.login('admin@example.com', 'wrong-password', { ipAddress: '198.51.100.14' }),
+    HttpStatus.UNAUTHORIZED,
+  );
+  await assertRejectsWithStatus(
+    () => authService.login('admin@example.com', 'wrong-password', { ipAddress: '198.51.100.15' }),
+    HttpStatus.UNAUTHORIZED,
+  );
+  await assertRejectsWithStatus(
+    () => authService.login('admin@example.com', 'wrong-password', { ipAddress: '198.51.100.16' }),
+    HttpStatus.UNAUTHORIZED,
+  );
+  await assertRejectsWithStatus(
+    () => authService.login('admin@example.com', 'wrong-password', { ipAddress: '198.51.100.17' }),
+    HttpStatus.TOO_MANY_REQUESTS,
+  );
+});
+
 test('authenticateSession rejects unknown, revoked and expired sessions', async () => {
   const { authService, sessionService } = buildAuthService({
     session: {
@@ -179,4 +329,43 @@ test('authenticateSession rejects unknown, revoked and expired sessions', async 
   }).authService;
 
   await assert.rejects(() => expiredAuth.authenticateSession(expiredToken));
+});
+
+test('authenticateSession throttles lastUsedAt writes to avoid per-request updates', async () => {
+  const now = Date.now();
+  const touchCalls: string[] = [];
+  const { authService, sessionService } = buildAuthService({
+    session: {
+      findUnique: async ({ where }: { where: { tokenHash: string } }) => {
+        const tokenHash = sessionService.hashToken(token);
+        if (where.tokenHash !== tokenHash) {
+          return null;
+        }
+
+        return {
+          id: 's-touch',
+          tokenHash,
+          revokedAt: null,
+          expiresAt: new Date(now + 60_000),
+          lastUsedAt: new Date(now - 60_000),
+          user: { id: 'u1', email: 'admin@example.com', status: 'ACTIVE', roles: [] },
+        };
+      },
+      update: async ({ where }: { where: { id: string } }) => {
+        touchCalls.push(where.id);
+        return { id: where.id };
+      },
+    },
+  });
+  const token = sessionService.createToken();
+
+  await authService.authenticateSession(token);
+  assert.equal(touchCalls.length, 0);
+});
+
+test('client IP resolution uses framework-resolved req.ip before socket remoteAddress', () => {
+  const { authService } = buildAuthService();
+
+  assert.equal(authService.getClientIp('203.0.113.99', '127.0.0.1'), '203.0.113.99');
+  assert.equal(authService.getClientIp(undefined, '127.0.0.1'), '127.0.0.1');
 });
