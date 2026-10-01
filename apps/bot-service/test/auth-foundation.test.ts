@@ -361,6 +361,7 @@ test('authenticateSession throttles lastUsedAt writes to avoid per-request updat
   token = sessionService.createToken();
 
   await authService.authenticateSession(token);
+  await authService.authenticateSession(token);
   assert.equal(touchCalls.length, 0);
 });
 
