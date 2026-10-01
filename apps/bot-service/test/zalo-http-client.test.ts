@@ -65,7 +65,7 @@ test('getMe maps unsuccessful envelope to API error metadata', async () => {
   );
 });
 
-test('getMe maps non-json response to invalid_response category', async () => {
+test('getMe maps non-json non-2xx response to http_error category', async () => {
   const client = new OfficialZaloHttpClient();
 
   globalThis.fetch = (async (): Promise<Response> =>
@@ -75,8 +75,26 @@ test('getMe maps non-json response to invalid_response category', async () => {
     async () => client.getMe('phase4-token'),
     (error: unknown) => {
       assert.ok(error instanceof ZaloApiRequestError);
-      assert.equal(error.category, 'invalid_response');
+      assert.equal(error.category, 'http_error');
       assert.equal(error.statusCode, 502);
+      assert.equal(error.retryAfterSeconds, 9);
+      return true;
+    },
+  );
+});
+
+test('getMe maps malformed json envelope on 2xx to invalid_response category', async () => {
+  const client = new OfficialZaloHttpClient();
+
+  globalThis.fetch = (async (): Promise<Response> =>
+    new Response('not json', { status: 200, headers: { 'retry-after': '9' } })) as typeof fetch;
+
+  await assert.rejects(
+    async () => client.getMe('phase4-token'),
+    (error: unknown) => {
+      assert.ok(error instanceof ZaloApiRequestError);
+      assert.equal(error.category, 'invalid_response');
+      assert.equal(error.statusCode, 200);
       assert.equal(error.retryAfterSeconds, 9);
       return true;
     },

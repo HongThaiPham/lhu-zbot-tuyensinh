@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { BotServiceConfig } from '@lhu/config';
-import { ZALO_CONFIG, ZALO_HTTP_CLIENT } from './zalo.constants';
+import { ZALO_CONFIG, ZALO_CONNECTION_TIMEOUT_MS, ZALO_HTTP_CLIENT } from './zalo.constants';
 import { ZaloIntegrationError, createSafeLogPayload, mapHttpError, sanitizeZaloUrl } from './zalo.errors';
 import type { ZaloHttpClient } from './http/zalo-http.types';
 import type { ZaloBotIdentity } from './zalo.types';
@@ -32,7 +32,7 @@ export class ZaloAdapter {
       });
     }
 
-    const response = await this.zaloHttpClient.getMe(this.token);
+    const response = await this.withTimeout(this.zaloHttpClient.getMe(this.token));
     return this.normalizeIdentity(response);
   }
 
@@ -42,6 +42,30 @@ export class ZaloAdapter {
 
   public mapError(error: unknown): ZaloIntegrationError {
     return mapHttpError(error);
+  }
+
+  private async withTimeout<T>(promise: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            reject(
+              new ZaloIntegrationError('Zalo getMe timeout', {
+                status: 'NETWORK_ERROR',
+                retryable: true,
+              }),
+            );
+          }, ZALO_CONNECTION_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
   }
 
   private normalizeIdentity(response: unknown): ZaloBotIdentity {

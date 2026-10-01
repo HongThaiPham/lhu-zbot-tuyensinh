@@ -54,17 +54,18 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
       clearTimeout(timer);
     }
 
-    const payload = await this.parseEnvelope(response, requestUrl);
     if (!response.ok) {
+      const errorEnvelope = await this.extractErrorEnvelope(response);
       throw new ZaloApiRequestError('Zalo API returned HTTP error', {
         category: 'http_error',
         requestUrl,
         statusCode: response.status,
-        upstreamCode: payload.error_code,
+        upstreamCode: errorEnvelope.error_code,
         retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
       });
     }
 
+    const payload = await this.parseEnvelope(response, requestUrl);
     if (payload.ok !== true) {
       throw new ZaloApiRequestError('Zalo API returned unsuccessful response', {
         category: 'api_error',
@@ -121,6 +122,23 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
     };
 
     return parsedEnvelope;
+  }
+
+  private async extractErrorEnvelope(response: Response): Promise<Partial<ZaloApiEnvelope>> {
+    try {
+      const data = await response.clone().json();
+      if (!data || typeof data !== 'object') {
+        return {};
+      }
+
+      const envelope = data as Record<string, unknown>;
+      if (typeof envelope.error_code === 'string' || typeof envelope.error_code === 'number') {
+        return { error_code: envelope.error_code };
+      }
+      return {};
+    } catch {
+      return {};
+    }
   }
 
   private extractRetryAfterSeconds(headers: Headers): number | undefined {
