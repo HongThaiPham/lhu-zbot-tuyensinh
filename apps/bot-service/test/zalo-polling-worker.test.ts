@@ -198,10 +198,12 @@ test('shutdown aborts in-flight long poll and no new poll starts', async () => {
   assert.equal(calls, 1);
 });
 
-test('non-retryable auth failures do not tight-loop', async () => {
-  const delays: number[] = [];
+test('non-retryable auth failures stop polling without retry scheduling', async () => {
+  let calls = 0;
+  let sleepCalled = false;
   const worker = createWorker({
     getUpdates: async () => {
+      calls += 1;
       throw new ZaloIntegrationError('auth', {
         status: 'AUTHENTICATION_FAILED',
         retryable: false,
@@ -210,14 +212,14 @@ test('non-retryable auth failures do not tight-loop', async () => {
     },
   });
 
-  (worker as unknown as { sleep: (ms: number) => Promise<void>; isRunning: boolean }).sleep = async (ms: number) => {
-    delays.push(ms);
-    (worker as unknown as { isRunning: boolean }).isRunning = false;
+  (worker as unknown as { sleep: (ms: number) => Promise<void> }).sleep = async () => {
+    sleepCalled = true;
   };
 
   await worker.onApplicationBootstrap();
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => setTimeout(resolve, 20));
   await worker.onApplicationShutdown();
 
-  assert.deepEqual(delays, [30000]);
+  assert.equal(calls, 1);
+  assert.equal(sleepCalled, false);
 });

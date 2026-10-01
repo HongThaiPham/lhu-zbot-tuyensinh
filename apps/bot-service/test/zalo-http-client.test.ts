@@ -174,3 +174,40 @@ test('getUpdates abort signal cancellation maps to timeout without token leak', 
     },
   );
 });
+
+test('getUpdates local timeout cancellation maps to timeout without token leak', async () => {
+  const client = new OfficialZaloHttpClient();
+  const originalSetTimeout = globalThis.setTimeout;
+
+  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], _timeout?: number, ...args: unknown[]) => {
+    const callback = typeof handler === 'function' ? handler : () => undefined;
+    callback(...args);
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+
+  globalThis.fetch = (async (
+    _input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    const signal = init?.signal;
+    if (signal?.aborted) {
+      throw new DOMException('aborted', 'AbortError');
+    }
+
+    return await new Promise<Response>(() => undefined);
+  }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      async () => client.getUpdates('phase5-token', { timeoutSeconds: 30 }),
+      (error: unknown) => {
+        assert.ok(error instanceof ZaloApiRequestError);
+        assert.equal(error.category, 'timeout');
+        assert.equal(error.requestUrl, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getUpdates');
+        return true;
+      },
+    );
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
+});

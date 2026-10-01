@@ -96,12 +96,15 @@ export class ZaloPollingWorker implements OnApplicationBootstrap, OnApplicationS
           this.logger.error(
             `zalo polling non-retryable error status=${mappedError.status} code=${mappedError.statusCode ?? 'n/a'}; ${operatorHint}`,
           );
+          this.logger.debug(JSON.stringify(safePayload));
+          this.isRunning = false;
+          break;
         } else {
           this.logger.warn(
             `zalo polling retryable error status=${mappedError.status} code=${mappedError.statusCode ?? 'n/a'} backoffMs=${this.backoffMs}`,
           );
+          this.logger.debug(JSON.stringify(safePayload));
         }
-        this.logger.debug(JSON.stringify(safePayload));
 
         const delayMs = this.nextDelay(mappedError);
         await this.sleep(delayMs);

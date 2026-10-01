@@ -13,38 +13,6 @@ interface ZaloApiEnvelope {
   readonly error_code?: string | number;
 }
 
-function mergeAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
-  if (signals.length === 1) {
-    return signals[0];
-  }
-
-  const controller = new AbortController();
-  const abortListeners: Array<{ signal: AbortSignal; listener: () => void }> = [];
-  const abort = () => {
-    if (!controller.signal.aborted) {
-      controller.abort();
-      for (const { signal, listener } of abortListeners) {
-        signal.removeEventListener('abort', listener);
-      }
-    }
-  };
-
-  for (const signal of signals) {
-    if (signal.aborted) {
-      abort();
-      break;
-    }
-
-    const listener = () => {
-      abort();
-    };
-    abortListeners.push({ signal, listener });
-    signal.addEventListener('abort', listener, { once: true });
-  }
-
-  return controller.signal;
-}
-
 @Injectable()
 export class OfficialZaloHttpClient implements ZaloHttpClient {
   public async getMe(token: string): Promise<unknown> {
@@ -81,7 +49,7 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
     const timeoutController = new AbortController();
     const timer = setTimeout(() => timeoutController.abort(), request.timeoutMs);
     const signal = request.signal
-      ? mergeAbortSignals([timeoutController.signal, request.signal])
+      ? AbortSignal.any([timeoutController.signal, request.signal])
       : timeoutController.signal;
     try {
       const response = await fetch(url, {

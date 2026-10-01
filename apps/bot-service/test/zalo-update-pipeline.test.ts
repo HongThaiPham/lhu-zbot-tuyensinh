@@ -75,7 +75,7 @@ test('normalizer maps documented message.text.received fields', () => {
   });
 
   const serialized = JSON.stringify(normalized);
-  assert.equal(serialized.includes('\"text\":'), false);
+  assert.equal(serialized.includes('"text":'), false);
   assert.equal(serialized.includes('sensitive-content-must-not-leak'), false);
 });
 
