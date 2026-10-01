@@ -52,11 +52,15 @@ async function main() {
   console.log('Database foundation verification passed');
 }
 
-main()
-  .catch((error) => {
+async function run() {
+  try {
+    await main();
+  } catch (error) {
     console.error('Database foundation verification failed', error);
-    throw error;
-  })
-  .finally(async () => {
+    process.exitCode = 1;
+  } finally {
     await prisma.$disconnect();
-  });
+  }
+}
+
+void run();

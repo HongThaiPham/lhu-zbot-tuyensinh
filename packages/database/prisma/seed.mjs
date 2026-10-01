@@ -18,11 +18,15 @@ async function main() {
   );
 }
 
-main()
-  .catch((error) => {
+async function run() {
+  try {
+    await main();
+  } catch (error) {
     console.error('Database seed failed', error);
-    throw error;
-  })
-  .finally(async () => {
+    process.exitCode = 1;
+  } finally {
     await prisma.$disconnect();
-  });
+  }
+}
+
+void run();
