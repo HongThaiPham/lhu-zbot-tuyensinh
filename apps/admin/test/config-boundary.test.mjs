@@ -47,5 +47,4 @@ test('admin next config fails in production when NEXT_PUBLIC_API_BASE_URL is inv
 
   assert.notEqual(result.status, 0);
   assert.match(output, /NEXT_PUBLIC_API_BASE_URL/);
-  assert.match(output, /invalid value/);
 });

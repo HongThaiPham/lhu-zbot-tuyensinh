@@ -19,8 +19,7 @@ FROM base AS build
 COPY --from=deps /workspace /workspace
 COPY . .
 ARG NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-RUN pnpm --filter @lhu/config build && pnpm --filter @lhu/admin build
+RUN NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} pnpm --filter @lhu/config build && NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} pnpm --filter @lhu/admin build
 
 FROM node:22-alpine AS runner
 ENV PNPM_HOME=/pnpm
