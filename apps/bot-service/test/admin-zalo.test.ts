@@ -92,6 +92,10 @@ test('admin zalo service audits connection test action and returns safe result',
       actorUserId: 'admin-1',
       action: 'ADMIN_ZALO_TEST_CONNECTION',
       entityType: 'zalo_connection',
+      metadata: {
+        ok: false,
+        status: 'NETWORK_ERROR',
+      },
     },
   ]);
 });

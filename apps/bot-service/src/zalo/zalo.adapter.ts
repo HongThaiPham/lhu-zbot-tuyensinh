@@ -47,7 +47,7 @@ export class ZaloAdapter {
   }
 
   private async withTimeout<T>(promise: Promise<T>): Promise<T> {
-    let timer: NodeJS.Timeout | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     try {
       return await Promise.race([
@@ -80,23 +80,22 @@ export class ZaloAdapter {
       });
     }
 
-    const identity: ZaloBotIdentity = {
+    const maybeDisplayName = typeof payload.name === 'string' && payload.name.trim().length > 0
+      ? payload.name.trim()
+      : undefined;
+    const maybeUsername = typeof payload.username === 'string' && payload.username.trim().length > 0
+      ? payload.username.trim()
+      : undefined;
+    const maybeAvatar = typeof payload.avatar === 'string' && payload.avatar.trim().length > 0
+      ? payload.avatar.trim()
+      : undefined;
+
+    return {
       id: String(id),
+      ...(maybeDisplayName ? { displayName: maybeDisplayName } : {}),
+      ...(maybeUsername ? { username: maybeUsername } : {}),
+      ...(maybeAvatar ? { avatar: maybeAvatar } : {}),
     };
-
-    if (typeof payload.name === 'string' && payload.name.trim().length > 0) {
-      identity.displayName = payload.name.trim();
-    }
-
-    if (typeof payload.username === 'string' && payload.username.trim().length > 0) {
-      identity.username = payload.username.trim();
-    }
-
-    if (typeof payload.avatar === 'string' && payload.avatar.trim().length > 0) {
-      identity.avatar = payload.avatar.trim();
-    }
-
-    return identity;
   }
 
   private toRecord(input: unknown): Record<string, unknown> {

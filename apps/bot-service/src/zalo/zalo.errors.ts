@@ -23,7 +23,14 @@ export class ZaloIntegrationError extends Error {
 
 export function sanitizeZaloUrl(rawUrl: string, token: string): string {
   const withTokenRedacted = token.trim().length > 0 ? rawUrl.replaceAll(token, '[REDACTED]') : rawUrl;
-  return withTokenRedacted.replace(/\/bot[^/]+\//g, '/bot[REDACTED]/');
+
+  try {
+    const parsed = new URL(withTokenRedacted);
+    parsed.pathname = parsed.pathname.replace(/^\/bot[^/]+\//, '/bot[REDACTED]/');
+    return parsed.toString();
+  } catch {
+    return withTokenRedacted.replace(/\/bot[^/]+\//g, '/bot[REDACTED]/');
+  }
 }
 
 function extractObjectRecord(input: unknown): Record<string, unknown> | null {
@@ -36,7 +43,8 @@ function extractObjectRecord(input: unknown): Record<string, unknown> | null {
 
 function extractRetryAfterSeconds(input: unknown): number | undefined {
   const record = extractObjectRecord(input);
-  const headers = extractObjectRecord(record?.headers);
+  const response = extractObjectRecord(record?.response);
+  const headers = extractObjectRecord(record?.headers) ?? extractObjectRecord(response?.headers);
   const retryAfterHeader = headers?.['retry-after'];
   if (typeof retryAfterHeader === 'string') {
     const parsed = Number.parseInt(retryAfterHeader, 10);
