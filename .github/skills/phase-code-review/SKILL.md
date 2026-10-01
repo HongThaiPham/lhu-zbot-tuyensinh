@@ -9,7 +9,7 @@ description: Adversarially review each phase pull request against repository arc
 Use this skill after every implementation phase and before declaring its PR ready to merge. Review the actual diff, not the implementation summary.
 
 ## Required Inputs
-Read `AGENTS.md`, `MASTER_IMPLEMENTATION_PLAN.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the exact phase acceptance criteria, and the complete PR diff. For Zalo behavior verify current official Zalo Bot documentation and installed `node-zalo-bot` API/types.
+Read `AGENTS.md`, `MASTER_IMPLEMENTATION_PLAN.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the exact phase acceptance criteria, and the complete PR diff. For Zalo behavior verify current official Zalo Bot documentation and the repository's REST transport contract/tests (no third-party SDK assumptions).
 
 ## Review Dimensions
 

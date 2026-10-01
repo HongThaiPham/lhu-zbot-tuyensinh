@@ -21,7 +21,8 @@
     "db:migrate:dev": "pnpm --filter @lhu/database db:migrate:dev",
     "db:seed": "pnpm --filter @lhu/database db:seed",
     "db:verify": "pnpm --filter @lhu/database db:verify",
-    "db:verify:fresh": "bash ./scripts/phase-2-database-foundation.sh"
+    "db:verify:fresh": "bash ./scripts/phase-2-database-foundation.sh",
+    "zalo:test-connection": "pnpm --filter @lhu/bot-service zalo:test-connection"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

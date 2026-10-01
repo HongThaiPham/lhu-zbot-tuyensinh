@@ -46,3 +46,14 @@ See:
 
 - `docs/AUTHENTICATION.md`
 - `docs/AUDIT.md`
+
+## Zalo REST API integration foundation (Phase 4)
+
+- Third-party Zalo SDK dependency: `none`
+- Internal boundary: `apps/bot-service/src/zalo`
+- Admin connection test endpoint: `POST /admin/zalo/test-connection`
+- Manual live test (optional, requires real token): `pnpm zalo:test-connection`
+
+See:
+
+- `docs/ZALO_INTEGRATION.md`

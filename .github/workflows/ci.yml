@@ -244,3 +244,26 @@ jobs:
 
       - name: Authentication foundation verification
         run: ./scripts/phase-3-auth-foundation.sh
+
+  zalo-api-foundation:
+    name: Zalo API Foundation
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Zalo API foundation verification
+        run: ./scripts/phase-4-zalo-api-foundation.sh

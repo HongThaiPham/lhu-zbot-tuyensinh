@@ -128,6 +128,7 @@ Before Phase 0 creates the pnpm workspace, `.github/workflows/ci.yml` uses a boo
 ## External Integrations
 
 Normal PR CI must not require paid/live external services. Use mocks/fakes/test containers as specified. Never put Zalo Bot Token, provider API keys, encryption keys or production credentials in repository files, workflow YAML, PR bodies, logs or fixtures.
+Zalo integration uses the official REST API via internal adapters; do not add third-party Zalo SDK dependencies.
 
 ## Phase 25 / Production
 

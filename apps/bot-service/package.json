@@ -6,6 +6,7 @@
     "build": "pnpm --filter @lhu/config build && pnpm --filter @lhu/database build && nest build",
     "start": "node dist/main",
     "auth:bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts",
+    "zalo:test-connection": "tsx src/scripts/zalo-test-connection.ts",
     "lint": "eslint . --ext .ts",
     "typecheck": "pnpm --filter @lhu/database build && tsc --noEmit",
     "test": "pnpm --filter @lhu/database build && node --test --import tsx ./test/**/*.test.ts"
@@ -30,11 +31,11 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.35.0",
+    "@typescript-eslint/parser": "^8.35.0",
     "eslint": "^9.39.4",
     "supertest": "^7.1.4",
     "tsx": "^4.20.6",
-    "typescript": "^5.8.3",
-    "@typescript-eslint/eslint-plugin": "^8.35.0",
-    "@typescript-eslint/parser": "^8.35.0"
+    "typescript": "^5.8.3"
   }
 }

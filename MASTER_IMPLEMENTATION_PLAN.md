@@ -10,7 +10,7 @@ The system MUST:
 - Answer admissions questions using official LHU admissions information.
 - Use `https://tuyensinh.lhu.edu.vn/` as the primary admissions knowledge source.
 - Follow current official Zalo Bot Platform documentation as the source of truth.
-- Use `node-zalo-bot` for Zalo Bot operations supported by that SDK.
+- Use the official Zalo Bot REST API through an internal HTTP adapter (no third-party Zalo SDK dependency).
 - Provide a Next.js administration application.
 - Provide a NestJS bot/backend service.
 - Support configurable OpenAI-compatible LLM gateways such as OmniRoute and 9Router through Base URL + API key + model configuration.
@@ -21,7 +21,7 @@ Official references:
 - Zalo Bot: `https://docs.zaloplatforms.com/docs/BOT`
 - LHU Admissions: `https://tuyensinh.lhu.edu.vn/`
 
-Before implementing a Zalo-specific behavior, Copilot MUST verify the current official Zalo Bot documentation. Never invent SDK methods, API fields, event types, limits, endpoints, or behavior.
+Before implementing a Zalo-specific behavior, Copilot MUST verify the current official Zalo Bot documentation. Never invent API fields, event types, limits, endpoints, or behavior.
 
 ## 2. Technology Decisions
 
@@ -33,7 +33,7 @@ Before implementing a Zalo-specific behavior, Copilot MUST verify the current of
 | Server state | TanStack Query |
 | Forms | React Hook Form + Zod |
 | Backend | NestJS + TypeScript |
-| Zalo | node-zalo-bot |
+| Zalo | Official Zalo Bot REST API via internal adapter |
 | Database | PostgreSQL |
 | ORM | Prisma |
 | Vector search | pgvector |
@@ -112,7 +112,7 @@ Zalo User -> Zalo Bot Platform -> Production Webhook -> NestJS Bot Service
                                                         |
                                                 Response Formatter
                                                         |
-                                                  node-zalo-bot
+                                         Official Zalo REST API
                                                         |
                                                        Zalo
 ```
@@ -121,7 +121,7 @@ Admin flow: `Browser -> Next.js Admin -> NestJS REST API -> PostgreSQL/Redis/ext
 
 ## 5. Core Architecture Rules
 
-Zalo is an infrastructure boundary. Only the Zalo module directly depends on `node-zalo-bot`. Flow: `Zalo Update -> Adapter -> Internal IncomingMessage -> Application -> Internal BotResponse -> Zalo Formatter -> SDK`.
+Zalo is an infrastructure boundary. Only the Zalo module directly depends on the official REST transport layer. Flow: `Zalo Update -> Adapter -> Internal IncomingMessage -> Application -> Internal BotResponse -> Zalo Formatter -> HTTP transport`.
 
 AI is also an infrastructure boundary. Business code MUST NOT directly call OmniRoute/9Router/provider clients. Define `ChatModelProvider` and `EmbeddingProvider` interfaces and implement `OpenAICompatibleProvider` first.
 
@@ -216,21 +216,21 @@ PostgreSQL, pgvector, Prisma package, migrations, seed framework and DB health c
 
 User/role models, authentication/session strategy, password security, NestJS guards/decorators, audit service and Admin login. Unauthorized access is rejected; role checks are tested; important mutations are audited.
 
-## Phase 4 — Zalo SDK Integration
+## Phase 4 — Zalo REST API Integration
 
-Before coding, read current official Zalo Bot docs and current `node-zalo-bot` package docs/types. Install SDK, implement adapter, connection/identity health test using documented capabilities and safe error mapping. SDK stays behind Zalo module boundary; tests use mocks/fakes; no invented methods.
+Before coding, read current official Zalo Bot docs for API calling and `getMe`. Implement `ZaloHttpClient` + adapter, connection/identity health test, and safe error mapping against official response contracts. No third-party Zalo SDKs; tests use mocks/fakes; no invented methods.
 
 ## Phase 5 — Development Polling Mode
 
-Implement documented polling/getUpdates flow, dispatcher, `/start`, `/help`, text/unknown handlers, graceful shutdown and mutual exclusion with webhook mode.
+Implement documented official `getUpdates` polling flow, dispatcher, `/start`, `/help`, text/unknown handlers, graceful shutdown and mutual exclusion with webhook mode.
 
 ## Phase 6 — Production Webhook
 
-Implement endpoint, exact current documented validation, event persistence, idempotency, enqueue, prompt ACK and Admin webhook operations only where documented. Duplicate events cannot duplicate responses; LLM is never called in webhook request lifecycle.
+Implement endpoint, exact current documented webhook validation, event persistence, idempotency, enqueue, prompt ACK and Admin webhook operations (`setWebhook`, `testWebhook`, `deleteWebhook`, `getWebhookInfo`) only where documented. Duplicate events cannot duplicate responses; LLM is never called in webhook request lifecycle.
 
 ## Phase 7 — Update Dispatcher and Message Sending
 
-Implement normalized `IncomingMessage`, handler registry, normalized `BotResponse`, formatter and documented Zalo send capabilities. Zalo DTOs do not leak into core modules and formatting respects current limits.
+Implement normalized `IncomingMessage`, handler registry, normalized `BotResponse`, formatter and documented official Zalo send APIs (`sendMessage`, `sendPhoto`, `sendSticker`, `sendChatAction`, `sendVoice`). Zalo DTOs do not leak into core modules and formatting respects current limits.
 
 ## Phase 8 — Zalo Admin
 
@@ -307,7 +307,7 @@ Before go-live verify current Zalo docs, production webhook, polling disabled, w
 # Production Checklist
 
 - [ ] Current Zalo Bot documentation reviewed.
-- [ ] `node-zalo-bot` integration verified.
+- [ ] Official Zalo REST API integration verified.
 - [ ] Production webhook verified.
 - [ ] Polling disabled in production.
 - [ ] Webhook validation verified.
