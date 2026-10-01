@@ -33,7 +33,13 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
         signal: controller.signal,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      const errorName =
+        error instanceof Error
+          ? error.name
+          : typeof error === 'object' && error !== null && 'name' in error && typeof error.name === 'string'
+            ? error.name
+            : undefined;
+      if (errorName === 'AbortError' || errorName === 'TimeoutError') {
         throw new ZaloApiRequestError('Zalo API timeout', {
           category: 'timeout',
           requestUrl,
@@ -49,6 +55,16 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
     }
 
     const payload = await this.parseEnvelope(response, requestUrl);
+    if (!response.ok) {
+      throw new ZaloApiRequestError('Zalo API returned HTTP error', {
+        category: 'http_error',
+        requestUrl,
+        statusCode: response.status,
+        upstreamCode: payload.error_code,
+        retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
+      });
+    }
+
     if (payload.ok !== true) {
       throw new ZaloApiRequestError('Zalo API returned unsuccessful response', {
         category: 'api_error',
@@ -103,16 +119,6 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
           : {}
       ),
     };
-
-    if (!response.ok) {
-      throw new ZaloApiRequestError('Zalo API returned HTTP error', {
-        category: 'http_error',
-        requestUrl,
-        statusCode: response.status,
-        upstreamCode: parsedEnvelope.error_code,
-        retryAfterSeconds: this.extractRetryAfterSeconds(response.headers),
-      });
-    }
 
     return parsedEnvelope;
   }
