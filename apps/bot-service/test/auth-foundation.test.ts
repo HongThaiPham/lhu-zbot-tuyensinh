@@ -363,6 +363,38 @@ test('authenticateSession throttles lastUsedAt writes to avoid per-request updat
   assert.equal(touchCalls.length, 0);
 });
 
+test('authenticateSession updates lastUsedAt when previous use is stale', async () => {
+  const now = Date.now();
+  const touchCalls: string[] = [];
+  const { authService, sessionService } = buildAuthService({
+    session: {
+      findUnique: async ({ where }: { where: { tokenHash: string } }) => {
+        const tokenHash = sessionService.hashToken(token);
+        if (where.tokenHash !== tokenHash) {
+          return null;
+        }
+
+        return {
+          id: 's-touch-stale',
+          tokenHash,
+          revokedAt: null,
+          expiresAt: new Date(now + 60_000),
+          lastUsedAt: new Date(now - 6 * 60_000),
+          user: { id: 'u1', email: 'admin@example.com', status: 'ACTIVE', roles: [] },
+        };
+      },
+      update: async ({ where }: { where: { id: string } }) => {
+        touchCalls.push(where.id);
+        return { id: where.id };
+      },
+    },
+  });
+  const token = sessionService.createToken();
+
+  await authService.authenticateSession(token);
+  assert.deepEqual(touchCalls, ['s-touch-stale']);
+});
+
 test('client IP resolution uses framework-resolved req.ip before socket remoteAddress', () => {
   const { authService } = buildAuthService();
 
