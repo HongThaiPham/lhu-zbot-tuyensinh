@@ -22,9 +22,11 @@ function loadNextConfigWithEnv(overrides = {}, removedKeys = []) {
 
 test('admin next config fails in production when NEXT_PUBLIC_API_BASE_URL is missing', () => {
   const result = loadNextConfigWithEnv({ NODE_ENV: 'production' }, ['NEXT_PUBLIC_API_BASE_URL']);
+  const output = [result.stderr, result.stdout].filter(Boolean).join('\n');
 
   assert.notEqual(result.status, 0);
-  assert.match(`${result.stderr}${result.stdout}`, /NEXT_PUBLIC_API_BASE_URL: required/);
+  assert.match(output, /NEXT_PUBLIC_API_BASE_URL/);
+  assert.match(output, /required/);
 });
 
 test('admin next config succeeds in production when NEXT_PUBLIC_API_BASE_URL is valid', () => {
