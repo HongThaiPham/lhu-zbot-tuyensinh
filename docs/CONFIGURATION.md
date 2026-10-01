@@ -31,7 +31,7 @@
 ### Admin
 
 - `NODE_ENV` (`development | test | production`) — required
-- `NEXT_PUBLIC_API_BASE_URL` (`http://` or `https://`) — required and safe to expose to browser bundles (defaults to `http://127.0.0.1:4201` for local tooling when unset)
+- `NEXT_PUBLIC_API_BASE_URL` (`http://` or `https://`) — required and safe to expose to browser bundles. Local admin runtime may apply `http://127.0.0.1:4201` fallback only in `development`/`test`; production fails fast if missing or invalid.
 
 ## Secret classification
 

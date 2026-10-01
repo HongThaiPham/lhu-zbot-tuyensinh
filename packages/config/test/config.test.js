@@ -150,3 +150,28 @@ test('admin configuration parses valid NEXT_PUBLIC_API_BASE_URL', () => {
   const config = loadAdminConfig(buildAdminEnv());
   assert.equal(config.nextPublicApiBaseUrl, 'http://localhost:4201');
 });
+
+test('admin production configuration fails when NEXT_PUBLIC_API_BASE_URL is missing', () => {
+  assertConfigError(
+    () =>
+      loadAdminConfig(
+        buildAdminEnv({
+          NODE_ENV: 'production',
+          NEXT_PUBLIC_API_BASE_URL: undefined,
+        }),
+      ),
+    'NEXT_PUBLIC_API_BASE_URL: required',
+  );
+});
+
+test('admin production configuration parses when NEXT_PUBLIC_API_BASE_URL is valid', () => {
+  const config = loadAdminConfig(
+    buildAdminEnv({
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_API_BASE_URL: 'https://admin.example.local',
+    }),
+  );
+
+  assert.equal(config.nodeEnv, 'production');
+  assert.equal(config.nextPublicApiBaseUrl, 'https://admin.example.local');
+});
