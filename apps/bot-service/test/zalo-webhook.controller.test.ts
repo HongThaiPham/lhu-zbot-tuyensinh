@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   BadRequestException,
+  UnauthorizedException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
@@ -29,8 +30,21 @@ test('webhook controller maps invalid payload processing errors to 400', async (
   } as never);
 
   await assert.rejects(
-    async () => controller.receive({}, 'application/json'),
+    async () => controller.receive({}, 'application/json', 'phase6-test-secret'),
     BadRequestException,
+  );
+});
+
+test('webhook controller rejects missing/invalid webhook secret', async () => {
+  const controller = new ZaloWebhookController({
+    processWebhookPayload: async () => {
+      throw new UnauthorizedException('Invalid webhook secret token');
+    },
+  } as never);
+
+  await assert.rejects(
+    async () => controller.receive({}, 'application/json', undefined),
+    UnauthorizedException,
   );
 });
 
@@ -41,7 +55,7 @@ test('webhook controller acknowledges processor failure safely', async () => {
     },
   } as never);
 
-  const response = await controller.receive({}, 'application/json');
+  const response = await controller.receive({}, 'application/json', 'phase6-test-secret');
   assert.deepEqual(response, {
     accepted: false,
     mode: 'webhook',

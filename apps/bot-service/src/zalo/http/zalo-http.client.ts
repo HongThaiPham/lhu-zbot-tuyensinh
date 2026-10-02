@@ -38,6 +38,7 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
       method: 'POST',
       body: {
         url: request.url,
+        secret_token: request.secret_token,
       },
       timeoutMs: ZALO_CONNECTION_TIMEOUT_MS,
     });

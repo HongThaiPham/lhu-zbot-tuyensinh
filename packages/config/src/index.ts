@@ -46,6 +46,7 @@ export interface BotServiceConfig {
   readonly trustProxy: boolean;
   readonly zaloPollTimeoutSeconds: number;
   readonly zaloWebhookUrl: string;
+  readonly zaloWebhookSecretToken: string;
 }
 
 export interface AdminConfig {
@@ -78,6 +79,7 @@ const botServiceEnvSchema = z.object({
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
   ZALO_POLL_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(300).default(30),
   ZALO_WEBHOOK_URL: z.string().url().optional(),
+  ZALO_WEBHOOK_SECRET_TOKEN: z.string().optional(),
 });
 
 const adminEnvSchema = z.object({
@@ -210,10 +212,23 @@ export function loadBotServiceConfig(
   }
 
   const webhookUrl = parsed.data.ZALO_WEBHOOK_URL?.trim() ?? '';
+  const webhookSecretToken = parsed.data.ZALO_WEBHOOK_SECRET_TOKEN?.trim() ?? '';
   if (webhookUrl.length > 0) {
     const webhookUrlIssue = parseUrl(webhookUrl, 'ZALO_WEBHOOK_URL', WEB_PROTOCOLS);
     if (webhookUrlIssue) {
       additionalIssues.push(webhookUrlIssue);
+    }
+  }
+
+  if (webhookSecretToken.length > 0 && (webhookSecretToken.length < 8 || webhookSecretToken.length > 256)) {
+    additionalIssues.push('ZALO_WEBHOOK_SECRET_TOKEN: must be 8-256 characters');
+  }
+
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.ZALO_UPDATE_MODE === 'webhook') {
+    if (webhookSecretToken.length === 0) {
+      additionalIssues.push(
+        'ZALO_WEBHOOK_SECRET_TOKEN: required in production when ZALO_UPDATE_MODE=webhook',
+      );
     }
   }
 
@@ -243,6 +258,7 @@ export function loadBotServiceConfig(
     trustProxy: parsed.data.TRUST_PROXY === 'true',
     zaloPollTimeoutSeconds: parsed.data.ZALO_POLL_TIMEOUT_SECONDS,
     zaloWebhookUrl: webhookUrl,
+    zaloWebhookSecretToken: webhookSecretToken,
   });
 }
 

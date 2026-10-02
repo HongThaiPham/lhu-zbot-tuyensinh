@@ -5,6 +5,7 @@ export interface GetUpdatesRequestOptions {
 
 export interface SetWebhookRequest {
   readonly url: string;
+  readonly secret_token: string;
 }
 
 export interface ZaloHttpClient {

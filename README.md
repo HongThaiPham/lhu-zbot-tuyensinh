@@ -68,13 +68,15 @@ See:
 
 ## Zalo production webhook foundation (Phase 6)
 
-- Implemented APIs: `setWebhook`, `testWebhook`, `deleteWebhook`, `getWebhookInfo`
+- Implemented verified APIs: `setWebhook`, `deleteWebhook`, `getWebhookInfo`
 - Public webhook endpoint: `POST /webhooks/zalo`
 - Shared inbound pipeline: `ZaloUpdateValidator -> ZaloUpdateNormalizer -> ZaloInboundEventProcessor` reused by polling and webhook
 - Mode gating: polling and webhook transports remain mutually exclusive via `ZALO_UPDATE_MODE`
+- Webhook auth: `X-Bot-Api-Secret-Token` verified against server-side `ZALO_WEBHOOK_SECRET_TOKEN`
 - Admin webhook management:
   - `GET /admin/zalo/webhook`
   - `POST /admin/zalo/webhook`
   - `POST /admin/zalo/webhook/test`
   - `DELETE /admin/zalo/webhook`
 - Verification script: `./scripts/phase-6-zalo-webhook-foundation.sh`
+- Local Zalo contract reference: `docs/integrations/ZALO_BOT_API_REFERENCE.md`

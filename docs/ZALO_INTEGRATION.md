@@ -2,21 +2,9 @@
 
 ## References consulted
 
-- Official Zalo Bot docs targets:
-  - `https://docs.zaloplatforms.com/docs/BOT/call_api`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/getMe`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/getUpdates`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/setWebhook`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/testWebhook`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/deleteWebhook`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/getWebhookInfo`
-  - `https://docs.zaloplatforms.com/docs/BOT/webhook`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendMessage`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendPhoto`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendSticker`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendChatAction`
-  - `https://docs.zaloplatforms.com/docs/BOT/apis/sendVoice`
-- Note: these endpoints were DNS-unreachable from this sandbox runtime during verification, so implementation remains constrained to documented Phase 5 behavior and mocked transport tests.
+- Repository-local Zalo contract source of truth:
+  - `docs/integrations/ZALO_BOT_API_REFERENCE.md`
+- Official Zalo Bot documentation remains the upstream source, but this repository-local reference is authoritative for agent work when live docs are unavailable.
 
 ## Architecture boundary
 
@@ -37,6 +25,7 @@ Phases 4-6 use direct official REST integration (no third-party SDK):
 - `ZALO_UPDATE_MODE` controls mutually exclusive runtime mode (`polling`/`webhook`).
 - `ZALO_POLL_TIMEOUT_SECONDS` controls Zalo long-poll timeout for `getUpdates`.
 - `ZALO_WEBHOOK_URL` stores the public callback URL for webhook lifecycle management.
+- `ZALO_WEBHOOK_SECRET_TOKEN` stores the server-side secret used for `setWebhook.secret_token` and webhook header verification (`X-Bot-Api-Secret-Token`).
 
 ## HTTP transport contract (Phases 4-6)
 
@@ -46,13 +35,11 @@ Phases 4-6 use direct official REST integration (no third-party SDK):
   - `getMe` (Phase 4)
   - `getUpdates` (Phase 5)
   - `setWebhook` (Phase 6)
-  - `testWebhook` (Phase 6)
   - `deleteWebhook` (Phase 6)
   - `getWebhookInfo` (Phase 6)
 - Method: `POST /bot<BOT_TOKEN>/getMe` (empty JSON object body)
 - Method: `POST /bot<BOT_TOKEN>/getUpdates` (JSON body includes optional `timeout`)
-- Method: `POST /bot<BOT_TOKEN>/setWebhook` (JSON body includes `url`)
-- Method: `POST /bot<BOT_TOKEN>/testWebhook` (empty JSON object body)
+- Method: `POST /bot<BOT_TOKEN>/setWebhook` (JSON body includes `url` and `secret_token`)
 - Method: `POST /bot<BOT_TOKEN>/deleteWebhook` (empty JSON object body)
 - Method: `POST /bot<BOT_TOKEN>/getWebhookInfo` (empty JSON object body)
 - Request timeout: 5 seconds
@@ -100,12 +87,16 @@ Connection testing performs one bounded `getMe` request and returns:
 - Public endpoint: `POST /webhooks/zalo`
 - Webhook requests are only processed when `ZALO_UPDATE_MODE=webhook`
 - In polling mode, webhook requests are acknowledged without processing
-- Supported webhook payload is a single JSON object and is runtime validated before normalization
-- No custom signature mechanism is applied because the current official BOT docs do not document one in this implementation baseline
+- Supported webhook payload is a single JSON object envelope with `ok: true` and `result`
+- Webhook authentication uses `X-Bot-Api-Secret-Token`, verified before validation/normalization/processing
 - Shared inbound pipeline:
   - `Webhook payload -> ZaloUpdateValidator -> ZaloUpdateNormalizer -> ZaloInboundEventProcessor`
   - `getUpdates` polling reuses the same validator/normalizer/processor classes
-- Endpoint-specific Zalo BOT docs remained DNS-unreachable in this runtime during verification, so payload and result-shape assumptions are intentionally minimal and non-speculative.
+
+## testWebhook status
+
+- `testWebhook` is currently treated as legacy/unverified per `docs/integrations/ZALO_BOT_API_REFERENCE.md`.
+- Production webhook behavior does not depend on `testWebhook`.
 
 ## Error handling and redaction
 

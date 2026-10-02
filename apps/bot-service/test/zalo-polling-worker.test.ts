@@ -25,6 +25,7 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
     trustProxy: false,
     zaloPollTimeoutSeconds: 30,
     zaloWebhookUrl: 'https://bot.example.com/webhooks/zalo',
+    zaloWebhookSecretToken: 'phase6-test-secret',
     ...overrides,
   };
 }

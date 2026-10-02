@@ -212,7 +212,7 @@ test('getUpdates local timeout cancellation maps to timeout without token leak',
   }
 });
 
-test('setWebhook calls official endpoint with url payload', async () => {
+test('setWebhook calls official endpoint with url and secret_token payload', async () => {
   const client = new OfficialZaloHttpClient();
   let calledUrl = '';
   let calledMethod = '';
@@ -233,11 +233,15 @@ test('setWebhook calls official endpoint with url payload', async () => {
 
   const response = await client.setWebhook('phase6-token', {
     url: 'https://bot.example.com/webhooks/zalo',
+    secret_token: 'phase6-webhook-secret',
   });
   assert.deepEqual(response, { ok: true, result: true });
   assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase6-token/setWebhook');
   assert.equal(calledMethod, 'POST');
-  assert.equal(calledBody, JSON.stringify({ url: 'https://bot.example.com/webhooks/zalo' }));
+  assert.equal(calledBody, JSON.stringify({
+    url: 'https://bot.example.com/webhooks/zalo',
+    secret_token: 'phase6-webhook-secret',
+  }));
 });
 
 test('testWebhook calls official endpoint with empty json body', async () => {
@@ -314,7 +318,11 @@ test('webhook methods sanitize token in errors', async () => {
     new Response('not json', { status: 502 })) as typeof fetch;
 
   await assert.rejects(
-    async () => client.setWebhook('phase6-secret-token', { url: 'https://bot.example.com/webhooks/zalo' }),
+    async () =>
+      client.setWebhook('phase6-secret-token', {
+        url: 'https://bot.example.com/webhooks/zalo',
+        secret_token: 'phase6-webhook-secret',
+      }),
     (error: unknown) => {
       assert.ok(error instanceof ZaloApiRequestError);
       assert.equal(error.requestUrl, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/setWebhook');

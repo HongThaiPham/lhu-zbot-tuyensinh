@@ -38,9 +38,13 @@ export class ZaloAdapter {
     return this.zaloHttpClient.getUpdates(this.token, options);
   }
 
-  public async setWebhook(url: string): Promise<void> {
+  public async setWebhook(input: { readonly url: string; readonly secretToken: string }): Promise<ZaloWebhookInfo> {
     this.ensureToken();
-    await this.zaloHttpClient.setWebhook(this.token, { url });
+    const response = await this.zaloHttpClient.setWebhook(this.token, {
+      url: input.url,
+      secret_token: input.secretToken,
+    });
+    return this.normalizeWebhookInfo(response, 'setWebhook');
   }
 
   public async testWebhook(): Promise<void> {
@@ -48,15 +52,16 @@ export class ZaloAdapter {
     await this.zaloHttpClient.testWebhook(this.token);
   }
 
-  public async deleteWebhook(): Promise<void> {
+  public async deleteWebhook(): Promise<ZaloWebhookInfo> {
     this.ensureToken();
-    await this.zaloHttpClient.deleteWebhook(this.token);
+    const response = await this.zaloHttpClient.deleteWebhook(this.token);
+    return this.normalizeWebhookInfo(response, 'deleteWebhook');
   }
 
   public async getWebhookInfo(): Promise<ZaloWebhookInfo> {
     this.ensureToken();
     const response = await this.zaloHttpClient.getWebhookInfo(this.token);
-    return this.normalizeWebhookInfo(response);
+    return this.normalizeWebhookInfo(response, 'getWebhookInfo');
   }
 
   public createSafeErrorPayload(error: unknown): Readonly<Record<string, unknown>> {
@@ -142,29 +147,40 @@ export class ZaloAdapter {
     };
   }
 
-  private normalizeWebhookInfo(response: unknown): ZaloWebhookInfo {
-    const envelope = this.toRecord(response, 'Zalo getWebhookInfo returned invalid payload type');
+  private normalizeWebhookInfo(
+    response: unknown,
+    operation: 'setWebhook' | 'deleteWebhook' | 'getWebhookInfo',
+  ): ZaloWebhookInfo {
+    const envelope = this.toRecord(response, `Zalo ${operation} returned invalid payload type`);
     if (envelope.ok !== true) {
-      throw new ZaloIntegrationError('Zalo getWebhookInfo returned unsuccessful response envelope', {
+      throw new ZaloIntegrationError(`Zalo ${operation} returned unsuccessful response envelope`, {
         status: 'INVALID_RESPONSE',
         retryable: false,
       });
     }
 
     const result = envelope.result;
-    if (result === undefined || result === null) {
-      return { isConfigured: false };
+    const payload = this.toRecord(result, `Zalo ${operation} returned invalid result payload`);
+    const url = typeof payload.url === 'string' ? payload.url.trim() : '';
+    if (typeof payload.url !== 'string') {
+      throw new ZaloIntegrationError(`Zalo ${operation} returned invalid webhook URL`, {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
     }
 
-    const payload = this.toRecord(result, 'Zalo getWebhookInfo returned invalid result payload');
-    const url = typeof payload.url === 'string' ? payload.url.trim() : '';
-    if (url.length === 0) {
-      return { isConfigured: false };
+    const updatedAt = payload.updated_at;
+    if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) {
+      throw new ZaloIntegrationError(`Zalo ${operation} returned invalid webhook updated_at`, {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
     }
 
     return {
-      isConfigured: true,
       url,
+      updatedAt,
+      isConfigured: url.length > 0,
     };
   }
 

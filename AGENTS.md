@@ -12,6 +12,8 @@ Zalo source of truth: `https://docs.zaloplatforms.com/docs/BOT`.
 
 Before implementing Zalo functionality, read the relevant current official docs and verify the official Zalo Bot REST API documentation and response contracts. Never invent endpoints, webhook headers/signatures, update fields, event types, message limits, polling/webhook semantics or retry behavior. Zalo Bot Platform must not be confused with Zalo OA/Open API or ZNS.
 
+For all Zalo Bot integration work, read `docs/integrations/ZALO_BOT_API_REFERENCE.md`. This file is the repository-local source of truth for Zalo Bot REST contracts when official Zalo documentation is unavailable to the agent. Do not infer Zalo Bot behavior from Telegram, Zalo OA, node-zalo-bot, old SDKs, or memory. If implementation conflicts with this reference, stop and report the conflict instead of guessing.
+
 LHU admissions source of truth: `https://tuyensinh.lhu.edu.vn/`. Critical admissions facts must come from official/versioned knowledge or approved structured data, not LLM memory.
 
 ## 2. Required architecture

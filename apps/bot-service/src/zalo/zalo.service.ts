@@ -1,4 +1,5 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { timingSafeEqual } from 'node:crypto';
+import { BadRequestException, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { BotServiceConfig } from '@lhu/config';
 import { ZALO_CONFIG } from './zalo.constants';
 import { ZaloAdapter } from './zalo.adapter';
@@ -49,11 +50,16 @@ export class ZaloService {
 
   public async setWebhook(url: string): Promise<ZaloWebhookMutationResult> {
     const normalizedUrl = this.validateWebhookUrl(url);
+    const webhookSecretToken = this.validateWebhookSecretToken(this.config.zaloWebhookSecretToken);
     try {
-      await this.zaloAdapter.setWebhook(normalizedUrl);
+      const webhook = await this.zaloAdapter.setWebhook({
+        url: normalizedUrl,
+        secretToken: webhookSecretToken,
+      });
       return {
         ok: true,
         status: 'SUCCESS',
+        webhook,
       };
     } catch (error) {
       const normalizedError =
@@ -108,10 +114,11 @@ export class ZaloService {
 
   public async deleteWebhook(): Promise<ZaloWebhookMutationResult> {
     try {
-      await this.zaloAdapter.deleteWebhook();
+      const webhook = await this.zaloAdapter.deleteWebhook();
       return {
         ok: true,
         status: 'SUCCESS',
+        webhook,
       };
     } catch (error) {
       const normalizedError =
@@ -145,7 +152,10 @@ export class ZaloService {
     }
   }
 
-  public async processWebhookPayload(payload: unknown): Promise<ZaloWebhookInboundResult> {
+  public async processWebhookPayload(
+    payload: unknown,
+    secretTokenHeader: string | undefined,
+  ): Promise<ZaloWebhookInboundResult> {
     if (this.config.zaloUpdateMode !== 'webhook') {
       this.logger.log('zalo webhook ignored (ZALO_UPDATE_MODE=polling)');
       return {
@@ -156,6 +166,7 @@ export class ZaloService {
     }
 
     try {
+      this.verifyWebhookSecretToken(secretTokenHeader);
       const rawEvents = this.updateValidator.extractRawWebhookEvents(payload);
       for (const rawEvent of rawEvents) {
         const event = this.updateNormalizer.normalize(rawEvent, 'webhook');
@@ -168,6 +179,10 @@ export class ZaloService {
         processed: rawEvents.length,
       };
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
       const normalizedError =
         error instanceof ZaloIntegrationError ? error : this.zaloAdapter.mapError(error);
       const safePayload = this.zaloAdapter.createSafeErrorPayload(error);
@@ -177,5 +192,35 @@ export class ZaloService {
       this.logger.debug(JSON.stringify(safePayload));
       throw normalizedError;
     }
+  }
+
+  private validateWebhookSecretToken(secretToken: string): string {
+    const normalized = secretToken.trim();
+    if (normalized.length < 8 || normalized.length > 256) {
+      throw new BadRequestException('Webhook secret token must be 8-256 characters');
+    }
+
+    return normalized;
+  }
+
+  private verifyWebhookSecretToken(secretTokenHeader: string | undefined): void {
+    const expectedSecret = this.config.zaloWebhookSecretToken.trim();
+    if (expectedSecret.length < 8 || expectedSecret.length > 256 || !secretTokenHeader) {
+      throw new UnauthorizedException('Invalid webhook secret token');
+    }
+
+    if (!this.constantTimeEquals(expectedSecret, secretTokenHeader.trim())) {
+      throw new UnauthorizedException('Invalid webhook secret token');
+    }
+  }
+
+  private constantTimeEquals(left: string, right: string): boolean {
+    const leftBuffer = Buffer.from(left, 'utf8');
+    const rightBuffer = Buffer.from(right, 'utf8');
+    if (leftBuffer.length !== rightBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(leftBuffer, rightBuffer);
   }
 }

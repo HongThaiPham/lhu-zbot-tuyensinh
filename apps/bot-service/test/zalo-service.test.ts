@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import type { BotServiceConfig } from '@lhu/config';
 import { ZaloService } from '../src/zalo/zalo.service';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
@@ -24,6 +24,7 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
     trustProxy: false,
     zaloPollTimeoutSeconds: 30,
     zaloWebhookUrl: 'https://bot.example.com/webhooks/zalo',
+    zaloWebhookSecretToken: 'phase6-test-secret',
     ...overrides,
   };
 }
@@ -34,9 +35,9 @@ function buildService(overrides: {
     getIdentity: () => Promise<unknown>;
     mapError: (error: unknown) => ZaloIntegrationError;
     createSafeErrorPayload: (error: unknown) => Readonly<Record<string, unknown>>;
-    setWebhook: (url: string) => Promise<void>;
+    setWebhook: (input: { readonly url: string; readonly secretToken: string }) => Promise<unknown>;
     testWebhook: () => Promise<void>;
-    deleteWebhook: () => Promise<void>;
+    deleteWebhook: () => Promise<unknown>;
     getWebhookInfo: () => Promise<unknown>;
   }>;
   readonly validator?: Partial<{ extractRawWebhookEvents: (payload: unknown) => readonly Readonly<Record<string, unknown>>[] }>;
@@ -55,10 +56,22 @@ function buildService(overrides: {
         ? error
         : new ZaloIntegrationError('mapped', { status: 'UPSTREAM_ERROR', retryable: false }),
     createSafeErrorPayload: () => ({}),
-    setWebhook: async () => undefined,
+    setWebhook: async () => ({
+      url: 'https://bot.example.com/webhooks/zalo',
+      updatedAt: 1_749_638_250_568,
+      isConfigured: true,
+    }),
     testWebhook: async () => undefined,
-    deleteWebhook: async () => undefined,
-    getWebhookInfo: async () => ({ isConfigured: false }),
+    deleteWebhook: async () => ({
+      url: '',
+      updatedAt: 1_749_638_250_568,
+      isConfigured: false,
+    }),
+    getWebhookInfo: async () => ({
+      url: '',
+      updatedAt: 1_749_638_250_568,
+      isConfigured: false,
+    }),
     ...overrides.adapter,
   };
   const validator = {
@@ -196,31 +209,46 @@ test('processWebhookPayload uses shared pipeline in webhook mode', async () => {
     },
   });
 
-  const result = await service.processWebhookPayload({ event_name: 'message.text.received' });
+  const result = await service.processWebhookPayload(
+    { ok: true, result: { event_name: 'message.text.received' } },
+    'phase6-test-secret',
+  );
   assert.deepEqual(result, { accepted: true, mode: 'webhook', processed: 1 });
   assert.equal(events.length, 1);
 });
 
 test('processWebhookPayload is gated off in polling mode', async () => {
   const service = buildService({ config: { zaloUpdateMode: 'polling' } });
-  const result = await service.processWebhookPayload({ event_name: 'message.text.received' });
+  const result = await service.processWebhookPayload(
+    { ok: true, result: { event_name: 'message.text.received' } },
+    undefined,
+  );
   assert.deepEqual(result, { accepted: false, mode: 'polling', processed: 0 });
 });
 
 test('setWebhook accepts https in production', async () => {
   let receivedUrl = '';
+  let receivedSecret = '';
   const service = buildService({
     config: { nodeEnv: 'production' },
     adapter: {
-      setWebhook: async (url: string) => {
-        receivedUrl = url;
+      setWebhook: async (input: { readonly url: string; readonly secretToken: string }) => {
+        receivedUrl = input.url;
+        receivedSecret = input.secretToken;
+        return {
+          url: input.url,
+          updatedAt: 1_749_638_250_568,
+          isConfigured: true,
+        };
       },
     },
   });
 
   const result = await service.setWebhook('https://bot.example.com/webhooks/zalo');
   assert.equal(result.ok, true);
+  assert.equal(result.webhook?.updatedAt, 1_749_638_250_568);
   assert.equal(receivedUrl, 'https://bot.example.com/webhooks/zalo');
+  assert.equal(receivedSecret, 'phase6-test-secret');
 });
 
 test('setWebhook rejects http in production', async () => {
@@ -254,8 +282,13 @@ test('setWebhook allows http in development mode', async () => {
   const service = buildService({
     config: { nodeEnv: 'development' },
     adapter: {
-      setWebhook: async (url: string) => {
-        receivedUrl = url;
+      setWebhook: async (input: { readonly url: string; readonly secretToken: string }) => {
+        receivedUrl = input.url;
+        return {
+          url: input.url,
+          updatedAt: 1_749_638_250_568,
+          isConfigured: true,
+        };
       },
     },
   });
@@ -263,4 +296,54 @@ test('setWebhook allows http in development mode', async () => {
   const result = await service.setWebhook('http://127.0.0.1:3001/webhooks/zalo');
   assert.equal(result.ok, true);
   assert.equal(receivedUrl, 'http://127.0.0.1:3001/webhooks/zalo');
+});
+
+test('processWebhookPayload rejects missing webhook secret header in webhook mode', async () => {
+  let processed = false;
+  const service = buildService({
+    processor: {
+      process: async () => {
+        processed = true;
+      },
+    },
+  });
+
+  await assert.rejects(
+    async () =>
+      service.processWebhookPayload(
+        { ok: true, result: { event_name: 'message.text.received' } },
+        undefined,
+      ),
+    UnauthorizedException,
+  );
+  assert.equal(processed, false);
+});
+
+test('processWebhookPayload rejects wrong webhook secret header in webhook mode', async () => {
+  let normalized = false;
+  let processed = false;
+  const service = buildService({
+    normalizer: {
+      normalize: () => {
+        normalized = true;
+        return { source: 'webhook', eventName: 'message.text.received', supported: true };
+      },
+    },
+    processor: {
+      process: async () => {
+        processed = true;
+      },
+    },
+  });
+
+  await assert.rejects(
+    async () =>
+      service.processWebhookPayload(
+        { ok: true, result: { event_name: 'message.text.received' } },
+        'wrong-secret',
+      ),
+    UnauthorizedException,
+  );
+  assert.equal(normalized, false);
+  assert.equal(processed, false);
 });

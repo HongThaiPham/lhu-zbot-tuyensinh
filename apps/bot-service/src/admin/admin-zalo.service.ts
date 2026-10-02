@@ -60,7 +60,8 @@ export class AdminZaloService {
       metadata: {
         ok: result.ok,
         status: result.status,
-        configured: true,
+        configured: result.ok ? result.webhook?.isConfigured : false,
+        updatedAt: result.ok ? result.webhook?.updatedAt : undefined,
       },
     });
     return result;
@@ -89,7 +90,8 @@ export class AdminZaloService {
       metadata: {
         ok: result.ok,
         status: result.status,
-        configured: false,
+        configured: result.ok ? result.webhook?.isConfigured : false,
+        updatedAt: result.ok ? result.webhook?.updatedAt : undefined,
       },
     });
     return result;

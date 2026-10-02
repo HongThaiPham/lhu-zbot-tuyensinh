@@ -39,9 +39,11 @@
 - Public webhook endpoint: `POST /webhooks/zalo`
 - `bot-api` processes webhook events only when `ZALO_UPDATE_MODE=webhook`
 - In `polling` mode, webhook requests are acknowledged but not processed
+- Webhook auth is verified via `X-Bot-Api-Secret-Token` (server-side `ZALO_WEBHOOK_SECRET_TOKEN`) before payload normalization/processing
 - Webhook payloads reuse the same normalization pipeline used by polling:
   - `ZaloUpdateValidator` -> `ZaloUpdateNormalizer` -> internal `ZaloInboundEvent` -> processor boundary
 - Admin webhook lifecycle management is protected by session auth + ADMIN RBAC + CSRF/origin guards under `/admin/zalo/webhook*`
+- Contract details must follow `docs/integrations/ZALO_BOT_API_REFERENCE.md`
 
 ## Authentication and authorization (Phase 3)
 

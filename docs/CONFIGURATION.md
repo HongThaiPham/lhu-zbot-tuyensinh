@@ -27,6 +27,7 @@
 - `ZALO_UPDATE_MODE` (`polling | webhook`) — required
 - `ZALO_POLL_TIMEOUT_SECONDS` (integer, `1-300`, default `30`) — long-poll timeout passed to Zalo `getUpdates`
 - `ZALO_WEBHOOK_URL` (`http://` or `https://`) — required in production when `ZALO_UPDATE_MODE=webhook`
+- `ZALO_WEBHOOK_SECRET_TOKEN` (string, `8-256` chars) — required in production when `ZALO_UPDATE_MODE=webhook`; used for `setWebhook.secret_token` and webhook header verification
 - `ZALO_BOT_TOKEN` — required in production, optional in development/test for deterministic mock-based tests
 - `PORT` (TCP port 1-65535) — optional, defaults to `3001`
 - `APP_ENCRYPTION_KEY` — required in production
@@ -51,7 +52,8 @@
 
 `APP_ENCRYPTION_KEY` must never be logged or rendered in error output. Production startup fails if it is missing, empty, placeholder/default, too short, or malformed.
 `ZALO_BOT_TOKEN` must never be logged or rendered in error output. Production startup fails if it is missing/empty or a placeholder/default value.
-`ZALO_WEBHOOK_URL` is used for webhook management operations and must be a valid `http://` or `https://` URL.
+`ZALO_WEBHOOK_URL` is used for webhook management operations and must be a valid `http://` or `https://` URL. Production webhook configuration requires HTTPS.
+`ZALO_WEBHOOK_SECRET_TOKEN` must remain server-only and must never be logged, returned in APIs, or stored in audit metadata.
 
 ## Docker Compose usage
 
@@ -71,6 +73,7 @@ On invalid configuration, startup fails immediately with a safe error format:
 - `APP_ENCRYPTION_KEY: required in production`
 - `ZALO_BOT_TOKEN: required in production`
 - `ZALO_WEBHOOK_URL: required in production when ZALO_UPDATE_MODE=webhook`
+- `ZALO_WEBHOOK_SECRET_TOKEN: required in production when ZALO_UPDATE_MODE=webhook`
 - `ZALO_POLL_TIMEOUT_SECONDS: invalid value`
 - `BOT_SERVICE_ROLE: invalid value`
 

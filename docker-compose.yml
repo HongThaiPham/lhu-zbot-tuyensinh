@@ -41,6 +41,7 @@ services:
       ZALO_UPDATE_MODE: ${ZALO_UPDATE_MODE:-polling}
       ZALO_BOT_TOKEN: ${ZALO_BOT_TOKEN:-development-zalo-token-placeholder}
       ZALO_WEBHOOK_URL: ${ZALO_WEBHOOK_URL:-https://bot.example.com/webhooks/zalo}
+      ZALO_WEBHOOK_SECRET_TOKEN: ${ZALO_WEBHOOK_SECRET_TOKEN:-phase6-test-secret-token}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lhu_admin_session}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
@@ -78,6 +79,7 @@ services:
       ZALO_UPDATE_MODE: ${ZALO_UPDATE_MODE:-polling}
       ZALO_BOT_TOKEN: ${ZALO_BOT_TOKEN:-development-zalo-token-placeholder}
       ZALO_WEBHOOK_URL: ${ZALO_WEBHOOK_URL:-https://bot.example.com/webhooks/zalo}
+      ZALO_WEBHOOK_SECRET_TOKEN: ${ZALO_WEBHOOK_SECRET_TOKEN:-phase6-test-secret-token}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lhu_admin_session}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}

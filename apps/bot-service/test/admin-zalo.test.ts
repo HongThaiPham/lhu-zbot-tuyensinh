@@ -74,11 +74,17 @@ test('admin zalo service audits all webhook operations with safe metadata', asyn
         webhook: {
           isConfigured: true,
           url: 'https://bot.example.com/webhooks/zalo',
+          updatedAt: 1_749_633_372_026,
         },
       }),
       setWebhook: async () => ({
         ok: true,
         status: 'SUCCESS',
+        webhook: {
+          isConfigured: true,
+          url: 'https://bot.example.com/webhooks/zalo',
+          updatedAt: 1_749_633_372_026,
+        },
       }),
       testWebhook: async () => ({
         ok: true,
@@ -87,6 +93,11 @@ test('admin zalo service audits all webhook operations with safe metadata', asyn
       deleteWebhook: async () => ({
         ok: true,
         status: 'SUCCESS',
+        webhook: {
+          isConfigured: false,
+          url: '',
+          updatedAt: 1_749_638_250_568,
+        },
       }),
     } as never,
   );

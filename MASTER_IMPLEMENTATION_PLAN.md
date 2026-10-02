@@ -20,6 +20,7 @@ The system MUST:
 Official references:
 - Zalo Bot: `https://docs.zaloplatforms.com/docs/BOT`
 - LHU Admissions: `https://tuyensinh.lhu.edu.vn/`
+- Repository-local Zalo contract reference for agent/offline work: `docs/integrations/ZALO_BOT_API_REFERENCE.md`
 
 Before implementing a Zalo-specific behavior, Copilot MUST verify the current official Zalo Bot documentation. Never invent API fields, event types, limits, endpoints, or behavior.
 

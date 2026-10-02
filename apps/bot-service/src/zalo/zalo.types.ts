@@ -52,13 +52,15 @@ export interface ZaloInboundEvent {
 }
 
 export interface ZaloWebhookInfo {
-  readonly url?: string;
+  readonly url: string;
+  readonly updatedAt: number;
   readonly isConfigured: boolean;
 }
 
 export interface ZaloWebhookOperationResult {
   readonly ok: true;
   readonly status: 'SUCCESS';
+  readonly webhook?: ZaloWebhookInfo;
 }
 
 export interface ZaloWebhookOperationFailureResult extends ZaloConnectionFailureResult {
