@@ -23,6 +23,7 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
     loginRateLimitMaxAttempts: 5,
     trustProxy: false,
     zaloPollTimeoutSeconds: 30,
+    zaloWebhookUrl: 'https://bot.example.com/webhooks/zalo',
     ...overrides,
   };
 }
@@ -31,6 +32,10 @@ function buildClient(getMeImpl: (token?: string) => Promise<unknown>): ZaloHttpC
   return {
     getMe: getMeImpl,
     getUpdates: async () => ({ ok: true, result: [] }),
+    setWebhook: async () => ({ ok: true, result: true }),
+    testWebhook: async () => ({ ok: true, result: true }),
+    deleteWebhook: async () => ({ ok: true, result: true }),
+    getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo' } }),
   };
 }
 
@@ -274,6 +279,10 @@ test('getUpdates forwards timeout and abort signal to http client', async () => 
       receivedSignal = options.signal;
       return { ok: true, result: null };
     },
+    setWebhook: async () => ({ ok: true, result: true }),
+    testWebhook: async () => ({ ok: true, result: true }),
+    deleteWebhook: async () => ({ ok: true, result: true }),
+    getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo' } }),
   };
 
   const adapter = new ZaloAdapter(buildConfig({ zaloBotToken: 'token-from-config' }), client);
@@ -286,4 +295,48 @@ test('getUpdates forwards timeout and abort signal to http client', async () => 
   assert.equal(receivedToken, 'token-from-config');
   assert.equal(receivedTimeoutSeconds, 30);
   assert.equal(receivedSignal, controller.signal);
+});
+
+test('setWebhook forwards configured token and url to http client', async () => {
+  let receivedToken = '';
+  let receivedUrl = '';
+  const client: ZaloHttpClient = {
+    getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+    getUpdates: async () => ({ ok: true, result: [] }),
+    setWebhook: async (token, request) => {
+      receivedToken = token;
+      receivedUrl = request.url;
+      return { ok: true, result: true };
+    },
+    testWebhook: async () => ({ ok: true, result: true }),
+    deleteWebhook: async () => ({ ok: true, result: true }),
+    getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo' } }),
+  };
+
+  const adapter = new ZaloAdapter(buildConfig({ zaloBotToken: 'token-from-config' }), client);
+  await adapter.setWebhook('https://bot.example.com/webhooks/zalo');
+
+  assert.equal(receivedToken, 'token-from-config');
+  assert.equal(receivedUrl, 'https://bot.example.com/webhooks/zalo');
+});
+
+test('getWebhookInfo maps url result safely', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    {
+      getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+      getUpdates: async () => ({ ok: true, result: [] }),
+      setWebhook: async () => ({ ok: true, result: true }),
+      testWebhook: async () => ({ ok: true, result: true }),
+      deleteWebhook: async () => ({ ok: true, result: true }),
+      getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', token: 'secret' } }),
+    },
+  );
+
+  const result = await adapter.getWebhookInfo();
+  assert.deepEqual(result, {
+    isConfigured: true,
+    url: 'https://bot.example.com/webhooks/zalo',
+  });
+  assert.equal(JSON.stringify(result).includes('secret'), false);
 });

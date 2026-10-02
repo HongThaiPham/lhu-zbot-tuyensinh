@@ -291,6 +291,29 @@ jobs:
       - name: Zalo polling foundation verification
         run: ./scripts/phase-5-zalo-polling-foundation.sh
 
+  zalo-webhook-foundation:
+    name: Zalo Webhook Foundation
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Zalo webhook foundation verification
+        run: ./scripts/phase-6-zalo-webhook-foundation.sh
+
   phase-review-contract:
     name: Phase Review Contract
     if: github.event_name == 'pull_request'

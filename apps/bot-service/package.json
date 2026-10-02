@@ -9,7 +9,7 @@
     "zalo:test-connection": "tsx src/scripts/zalo-test-connection.ts",
     "lint": "eslint . --ext .ts",
     "typecheck": "pnpm --filter @lhu/database build && tsc --noEmit",
-    "test": "pnpm --filter @lhu/database build && node --test --import tsx ./test/**/*.test.ts"
+    "test": "pnpm --filter @lhu/config build && pnpm --filter @lhu/database build && node --test --import tsx ./test/**/*.test.ts"
   },
   "dependencies": {
     "@lhu/config": "workspace:*",

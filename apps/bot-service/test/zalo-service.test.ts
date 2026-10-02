@@ -1,28 +1,94 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { BotServiceConfig } from '@lhu/config';
 import { ZaloService } from '../src/zalo/zalo.service';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
 
-test('raw transport response does not leak outside zalo service boundary', async () => {
-  const rawResponse = {
-    id: 'bot-1',
-    transport: 'http-internal',
-    access_token: 'must-not-leak',
+function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfig {
+  return {
+    nodeEnv: 'test',
+    databaseUrl: 'postgresql://localhost:5432/lhu_zbot?schema=public',
+    redisUrl: 'redis://localhost:6379',
+    botServiceRole: 'api',
+    zaloUpdateMode: 'webhook',
+    zaloBotToken: 'phase6-token',
+    port: 3001,
+    appEncryptionKey: 'development-only-app-encryption-key-not-for-production',
+    sessionCookieName: 'lhu_admin_session',
+    sessionTtlSeconds: 1200,
+    adminOrigin: 'http://127.0.0.1:4100',
+    sessionCookieSameSite: 'lax',
+    loginRateLimitWindowSeconds: 300,
+    loginRateLimitMaxAttempts: 5,
+    trustProxy: false,
+    zaloPollTimeoutSeconds: 30,
+    zaloWebhookUrl: 'https://bot.example.com/webhooks/zalo',
+    ...overrides,
   };
+}
 
-  const service = new ZaloService({
+function buildService(overrides: {
+  readonly config?: Partial<BotServiceConfig>;
+  readonly adapter?: Partial<{
+    getIdentity: () => Promise<unknown>;
+    mapError: (error: unknown) => ZaloIntegrationError;
+    createSafeErrorPayload: (error: unknown) => Readonly<Record<string, unknown>>;
+    setWebhook: (url: string) => Promise<void>;
+    testWebhook: () => Promise<void>;
+    deleteWebhook: () => Promise<void>;
+    getWebhookInfo: () => Promise<unknown>;
+  }>;
+  readonly validator?: Partial<{ extractRawWebhookEvents: (payload: unknown) => readonly Readonly<Record<string, unknown>>[] }>;
+  readonly normalizer?: Partial<{ normalize: (payload: Readonly<Record<string, unknown>>, source: 'polling' | 'webhook') => unknown }>;
+  readonly processor?: Partial<{ process: (event: unknown) => Promise<void> }>;
+} = {}) {
+  const adapter = {
     getIdentity: async () => ({
-      id: String((rawResponse as { id: string }).id),
+      id: 'bot-1',
       accountName: 'bot.VDKyGxQvc',
       accountType: 'BASIC',
       canJoinGroups: false,
     }),
-    mapError: () => {
-      throw new Error('should not run');
-    },
+    mapError: (error: unknown) =>
+      error instanceof ZaloIntegrationError
+        ? error
+        : new ZaloIntegrationError('mapped', { status: 'UPSTREAM_ERROR', retryable: false }),
     createSafeErrorPayload: () => ({}),
-  } as never);
+    setWebhook: async () => undefined,
+    testWebhook: async () => undefined,
+    deleteWebhook: async () => undefined,
+    getWebhookInfo: async () => ({ isConfigured: false }),
+    ...overrides.adapter,
+  };
+  const validator = {
+    extractRawWebhookEvents: (payload: unknown) =>
+      payload && typeof payload === 'object' ? [payload as Record<string, unknown>] : [],
+    ...overrides.validator,
+  };
+  const normalizer = {
+    normalize: (payload: Readonly<Record<string, unknown>>, source: 'polling' | 'webhook') => ({
+      source,
+      eventName: String(payload.event_name ?? 'unknown'),
+      supported: true,
+    }),
+    ...overrides.normalizer,
+  };
+  const processor = {
+    process: async () => undefined,
+    ...overrides.processor,
+  };
 
+  return new ZaloService(
+    buildConfig(overrides.config),
+    adapter as never,
+    validator as never,
+    normalizer as never,
+    processor as never,
+  );
+}
+
+test('raw transport response does not leak outside zalo service boundary', async () => {
+  const service = buildService();
   const result = await service.testConnection();
 
   assert.deepEqual(result, {
@@ -40,23 +106,20 @@ test('raw transport response does not leak outside zalo service boundary', async
 });
 
 test('service maps normalized errors to safe connection result', async () => {
-  const service = new ZaloService({
-    getIdentity: async () => {
-      throw new ZaloIntegrationError('Rate limit', {
-        status: 'RATE_LIMITED',
-        retryable: true,
-        statusCode: 429,
-        retryAfterSeconds: 15,
-      });
+  const service = buildService({
+    adapter: {
+      getIdentity: async () => {
+        throw new ZaloIntegrationError('Rate limit', {
+          status: 'RATE_LIMITED',
+          retryable: true,
+          statusCode: 429,
+          retryAfterSeconds: 15,
+        });
+      },
     },
-    mapError: () => {
-      throw new Error('should not run');
-    },
-    createSafeErrorPayload: () => ({}),
-  } as never);
+  });
 
   const result = await service.testConnection();
-
   assert.deepEqual(result, {
     ok: false,
     status: 'RATE_LIMITED',
@@ -71,29 +134,22 @@ test('service log output excludes token values', async () => {
   const token = 'sensitive-zalo-token';
   const logs: string[] = [];
   const debugLogs: string[] = [];
-
-  const service = new ZaloService({
-    getIdentity: async () => {
-      throw {
-        name: 'AxiosError',
-        response: {
-          status: 401,
-        },
-        config: {
-          url: `https://bot-api.zaloplatforms.com/bot${token}/getMe`,
-        },
-      };
-    },
-    mapError: () =>
-      new ZaloIntegrationError('auth', {
-        status: 'AUTHENTICATION_FAILED',
-        retryable: false,
-        statusCode: 401,
+  const service = buildService({
+    adapter: {
+      getIdentity: async () => {
+        throw new Error('boom');
+      },
+      mapError: () =>
+        new ZaloIntegrationError('auth', {
+          status: 'AUTHENTICATION_FAILED',
+          retryable: false,
+          statusCode: 401,
+        }),
+      createSafeErrorPayload: () => ({
+        requestUrl: 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getMe',
       }),
-    createSafeErrorPayload: () => ({
-      requestUrl: 'https://bot-api.zaloplatforms.com/bot[REDACTED]/getMe',
-    }),
-  } as never);
+    },
+  });
 
   (
     service as unknown as {
@@ -117,4 +173,35 @@ test('service log output excludes token values', async () => {
   const mergedLogs = `${logs.join('\n')}\n${debugLogs.join('\n')}`;
   assert.equal(mergedLogs.includes(token), false);
   assert.match(mergedLogs, /\[REDACTED\]/);
+});
+
+test('processWebhookPayload uses shared pipeline in webhook mode', async () => {
+  const events: unknown[] = [];
+  const service = buildService({
+    validator: {
+      extractRawWebhookEvents: () => [{ event_name: 'message.text.received' }],
+    },
+    normalizer: {
+      normalize: () => ({
+        source: 'webhook',
+        eventName: 'message.text.received',
+        supported: true,
+      }),
+    },
+    processor: {
+      process: async (event: unknown) => {
+        events.push(event);
+      },
+    },
+  });
+
+  const result = await service.processWebhookPayload({ event_name: 'message.text.received' });
+  assert.deepEqual(result, { accepted: true, mode: 'webhook', processed: 1 });
+  assert.equal(events.length, 1);
+});
+
+test('processWebhookPayload is gated off in polling mode', async () => {
+  const service = buildService({ config: { zaloUpdateMode: 'polling' } });
+  const result = await service.processWebhookPayload({ event_name: 'message.text.received' });
+  assert.deepEqual(result, { accepted: false, mode: 'polling', processed: 0 });
 });

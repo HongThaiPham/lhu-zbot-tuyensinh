@@ -65,3 +65,16 @@ See:
 - Mode gating: polling runs only when `ZALO_UPDATE_MODE=polling`
 - `bot-api` health endpoints remain free of live Zalo dependency
 - Verification script: `./scripts/phase-5-zalo-polling-foundation.sh`
+
+## Zalo production webhook foundation (Phase 6)
+
+- Implemented APIs: `setWebhook`, `testWebhook`, `deleteWebhook`, `getWebhookInfo`
+- Public webhook endpoint: `POST /webhooks/zalo`
+- Shared inbound pipeline: `ZaloUpdateValidator -> ZaloUpdateNormalizer -> ZaloInboundEventProcessor` reused by polling and webhook
+- Mode gating: polling and webhook transports remain mutually exclusive via `ZALO_UPDATE_MODE`
+- Admin webhook management:
+  - `GET /admin/zalo/webhook`
+  - `POST /admin/zalo/webhook`
+  - `POST /admin/zalo/webhook/test`
+  - `DELETE /admin/zalo/webhook`
+- Verification script: `./scripts/phase-6-zalo-webhook-foundation.sh`

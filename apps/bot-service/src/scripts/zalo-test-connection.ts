@@ -1,7 +1,10 @@
 import { loadBotServiceConfig } from '@lhu/config';
 import { ZaloAdapter } from '../zalo/zalo.adapter';
 import { OfficialZaloHttpClient } from '../zalo/http/zalo-http.client';
+import { ZaloInboundEventProcessor } from '../zalo/zalo-inbound-event.processor';
 import { ZaloService } from '../zalo/zalo.service';
+import { ZaloUpdateNormalizer } from '../zalo/zalo-update.normalizer';
+import { ZaloUpdateValidator } from '../zalo/zalo-update.validator';
 
 async function main(): Promise<void> {
   const config = loadBotServiceConfig(process.env);
@@ -10,7 +13,13 @@ async function main(): Promise<void> {
   }
 
   const adapter = new ZaloAdapter(config, new OfficialZaloHttpClient());
-  const service = new ZaloService(adapter);
+  const service = new ZaloService(
+    config,
+    adapter,
+    new ZaloUpdateValidator(),
+    new ZaloUpdateNormalizer(),
+    new ZaloInboundEventProcessor(),
+  );
   const result = await service.testConnection();
 
   if (!result.ok) {

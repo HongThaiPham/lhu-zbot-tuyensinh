@@ -26,6 +26,7 @@ function buildBotEnv(overrides = {}) {
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: '5',
     TRUST_PROXY: 'false',
     ZALO_POLL_TIMEOUT_SECONDS: '30',
+    ZALO_WEBHOOK_URL: 'https://bot.example.com/webhooks/zalo',
     ...overrides,
   };
 }
@@ -55,6 +56,7 @@ test('valid development bot config parses', () => {
   assert.equal(config.sessionCookieName, 'lhu_admin_session');
   assert.equal(config.trustProxy, false);
   assert.equal(config.zaloPollTimeoutSeconds, 30);
+  assert.equal(config.zaloWebhookUrl, 'https://bot.example.com/webhooks/zalo');
 });
 
 test('development config can omit zalo token for deterministic tests', () => {
@@ -75,6 +77,20 @@ test('valid production bot config parses', () => {
   assert.equal(config.nodeEnv, 'production');
   assert.equal(config.zaloUpdateMode, 'webhook');
   assert.equal(config.sessionCookieSameSite, 'strict');
+});
+
+test('missing production webhook url fails when webhook mode is enabled', () => {
+  assertConfigError(
+    () =>
+      loadBotServiceConfig(
+        buildBotEnv({
+          NODE_ENV: 'production',
+          ZALO_UPDATE_MODE: 'webhook',
+          ZALO_WEBHOOK_URL: undefined,
+        }),
+      ),
+    'ZALO_WEBHOOK_URL: required in production when ZALO_UPDATE_MODE=webhook',
+  );
 });
 
 test('missing production secret fails', () => {

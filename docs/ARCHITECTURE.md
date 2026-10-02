@@ -34,6 +34,15 @@
 - Polling output is normalized via:
   - `ZaloUpdateValidator` -> `ZaloUpdateNormalizer` -> internal `ZaloInboundEvent` -> processor boundary.
 
+## Zalo webhook transport foundation (Phase 6)
+
+- Public webhook endpoint: `POST /webhooks/zalo`
+- `bot-api` processes webhook events only when `ZALO_UPDATE_MODE=webhook`
+- In `polling` mode, webhook requests are acknowledged but not processed
+- Webhook payloads reuse the same normalization pipeline used by polling:
+  - `ZaloUpdateValidator` -> `ZaloUpdateNormalizer` -> internal `ZaloInboundEvent` -> processor boundary
+- Admin webhook lifecycle management is protected by session auth + ADMIN RBAC + CSRF/origin guards under `/admin/zalo/webhook*`
+
 ## Authentication and authorization (Phase 3)
 
 - Strategy: server-issued opaque session cookie with server-side session persistence in PostgreSQL.

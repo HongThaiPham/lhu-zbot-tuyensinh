@@ -135,6 +135,7 @@ Zalo integration uses the official REST API via internal adapters; do not add th
 - Phase 3 verification: `./scripts/phase-3-auth-foundation.sh`
 - Phase 4 verification: `./scripts/phase-4-zalo-api-foundation.sh`
 - Phase 5 verification: `./scripts/phase-5-zalo-polling-foundation.sh`
+- Phase 6 verification: `./scripts/phase-6-zalo-webhook-foundation.sh`
 
 ## Phase 25 / Production
 
