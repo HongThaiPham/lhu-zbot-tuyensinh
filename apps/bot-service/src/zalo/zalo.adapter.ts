@@ -159,17 +159,16 @@ export class ZaloAdapter {
       });
     }
 
-    const result = envelope.result;
-    const payload = this.toRecord(result, `Zalo ${operation} returned invalid result payload`);
-    const url = typeof payload.url === 'string' ? payload.url.trim() : '';
-    if (typeof payload.url !== 'string') {
+    const result = this.toRecord(envelope.result, `Zalo ${operation} returned invalid result payload`);
+    const url = typeof result.url === 'string' ? result.url.trim() : '';
+    if (typeof result.url !== 'string') {
       throw new ZaloIntegrationError(`Zalo ${operation} returned invalid webhook URL`, {
         status: 'INVALID_RESPONSE',
         retryable: false,
       });
     }
 
-    const updatedAt = payload.updated_at;
+    const updatedAt = result.updated_at;
     if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) {
       throw new ZaloIntegrationError(`Zalo ${operation} returned invalid webhook updated_at`, {
         status: 'INVALID_RESPONSE',
