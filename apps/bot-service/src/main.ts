@@ -6,6 +6,7 @@ import { loadBotServiceConfig } from '@lhu/config';
 import cookieParser from 'cookie-parser';
 import type { Express } from 'express';
 import { AppModule } from './app.module';
+import { configureRequestBodyParsers } from './http/body-parser';
 import { PrismaService } from './prisma/prisma.service';
 import { getTrustProxySetting } from './http/trust-proxy';
 
@@ -98,9 +99,12 @@ async function bootstrap() {
     return;
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false,
+  });
   const expressApp = app.getHttpAdapter().getInstance() as Express;
   expressApp.set('trust proxy', getTrustProxySetting(config.trustProxy));
+  configureRequestBodyParsers(expressApp);
   app.use(cookieParser());
   app.enableCors({
     origin: config.adminOrigin,

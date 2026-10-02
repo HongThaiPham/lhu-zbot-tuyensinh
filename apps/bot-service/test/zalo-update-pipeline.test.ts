@@ -61,6 +61,14 @@ test('webhook validator rejects invalid payload type', () => {
   });
 });
 
+test('webhook validator rejects array payload', () => {
+  assert.throws(() => validator.extractRawWebhookEvents([{ event_name: 'message.text.received' }]), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
 test('normalizer maps documented message.text.received fields', () => {
   const normalized = normalizer.normalize(
     {

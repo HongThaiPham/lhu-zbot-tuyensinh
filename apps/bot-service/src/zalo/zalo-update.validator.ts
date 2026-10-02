@@ -33,14 +33,8 @@ export class ZaloUpdateValidator {
   }
 
   public extractRawWebhookEvents(payload: unknown): readonly Readonly<Record<string, unknown>>[] {
-    if (Array.isArray(payload)) {
-      return payload
-        .filter((event): event is Readonly<Record<string, unknown>> => !!event && typeof event === 'object')
-        .map((event) => Object.freeze({ ...event }));
-    }
-
-    if (!payload || typeof payload !== 'object') {
-      throw new ZaloIntegrationError('Zalo webhook payload must be a JSON object or array', {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new ZaloIntegrationError('Zalo webhook payload must be a JSON object', {
         status: 'INVALID_RESPONSE',
         retryable: false,
       });

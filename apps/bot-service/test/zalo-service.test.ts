@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { BadRequestException } from '@nestjs/common';
 import type { BotServiceConfig } from '@lhu/config';
 import { ZaloService } from '../src/zalo/zalo.service';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
@@ -204,4 +205,62 @@ test('processWebhookPayload is gated off in polling mode', async () => {
   const service = buildService({ config: { zaloUpdateMode: 'polling' } });
   const result = await service.processWebhookPayload({ event_name: 'message.text.received' });
   assert.deepEqual(result, { accepted: false, mode: 'polling', processed: 0 });
+});
+
+test('setWebhook accepts https in production', async () => {
+  let receivedUrl = '';
+  const service = buildService({
+    config: { nodeEnv: 'production' },
+    adapter: {
+      setWebhook: async (url: string) => {
+        receivedUrl = url;
+      },
+    },
+  });
+
+  const result = await service.setWebhook('https://bot.example.com/webhooks/zalo');
+  assert.equal(result.ok, true);
+  assert.equal(receivedUrl, 'https://bot.example.com/webhooks/zalo');
+});
+
+test('setWebhook rejects http in production', async () => {
+  const service = buildService({
+    config: { nodeEnv: 'production' },
+  });
+
+  await assert.rejects(
+    async () => service.setWebhook('http://bot.example.com/webhooks/zalo'),
+    (error: unknown) => {
+      assert.ok(error instanceof BadRequestException);
+      return true;
+    },
+  );
+});
+
+test('setWebhook rejects invalid url', async () => {
+  const service = buildService();
+
+  await assert.rejects(
+    async () => service.setWebhook('not-a-valid-url'),
+    (error: unknown) => {
+      assert.ok(error instanceof BadRequestException);
+      return true;
+    },
+  );
+});
+
+test('setWebhook allows http in development mode', async () => {
+  let receivedUrl = '';
+  const service = buildService({
+    config: { nodeEnv: 'development' },
+    adapter: {
+      setWebhook: async (url: string) => {
+        receivedUrl = url;
+      },
+    },
+  });
+
+  const result = await service.setWebhook('http://127.0.0.1:3001/webhooks/zalo');
+  assert.equal(result.ok, true);
+  assert.equal(receivedUrl, 'http://127.0.0.1:3001/webhooks/zalo');
 });

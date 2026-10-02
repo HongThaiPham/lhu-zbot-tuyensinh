@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import type { BotServiceConfig } from '@lhu/config';
 import { ZALO_CONFIG } from './zalo.constants';
 import { ZaloAdapter } from './zalo.adapter';
@@ -48,8 +48,9 @@ export class ZaloService {
   }
 
   public async setWebhook(url: string): Promise<ZaloWebhookMutationResult> {
+    const normalizedUrl = this.validateWebhookUrl(url);
     try {
-      await this.zaloAdapter.setWebhook(url);
+      await this.zaloAdapter.setWebhook(normalizedUrl);
       return {
         ok: true,
         status: 'SUCCESS',
@@ -83,6 +84,26 @@ export class ZaloService {
       this.logger.debug(JSON.stringify(safePayload));
       return toFailureResult(normalizedError);
     }
+  }
+
+  private validateWebhookUrl(url: string): string {
+    const trimmed = url.trim();
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      throw new BadRequestException('Invalid webhook URL');
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new BadRequestException('Invalid webhook URL');
+    }
+
+    if (this.config.nodeEnv === 'production' && parsed.protocol !== 'https:') {
+      throw new BadRequestException('Webhook URL must use HTTPS in production');
+    }
+
+    return parsed.toString();
   }
 
   public async deleteWebhook(): Promise<ZaloWebhookMutationResult> {

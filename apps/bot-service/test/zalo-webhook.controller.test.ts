@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   BadRequestException,
-  PayloadTooLargeException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { ZaloIntegrationError } from '../src/zalo/zalo.errors';
@@ -19,17 +18,6 @@ test('webhook controller requires application/json content type', async () => {
   );
 });
 
-test('webhook controller rejects oversized payloads', async () => {
-  const controller = new ZaloWebhookController({
-    processWebhookPayload: async () => ({ accepted: true, mode: 'webhook', processed: 1 }),
-  } as never);
-
-  await assert.rejects(
-    async () => controller.receive({}, 'application/json', String(300 * 1024)),
-    PayloadTooLargeException,
-  );
-});
-
 test('webhook controller maps invalid payload processing errors to 400', async () => {
   const controller = new ZaloWebhookController({
     processWebhookPayload: async () => {
@@ -41,7 +29,7 @@ test('webhook controller maps invalid payload processing errors to 400', async (
   } as never);
 
   await assert.rejects(
-    async () => controller.receive({}, 'application/json', '100'),
+    async () => controller.receive({}, 'application/json'),
     BadRequestException,
   );
 });
@@ -53,7 +41,7 @@ test('webhook controller acknowledges processor failure safely', async () => {
     },
   } as never);
 
-  const response = await controller.receive({}, 'application/json', '100');
+  const response = await controller.receive({}, 'application/json');
   assert.deepEqual(response, {
     accepted: false,
     mode: 'webhook',

@@ -100,11 +100,12 @@ Connection testing performs one bounded `getMe` request and returns:
 - Public endpoint: `POST /webhooks/zalo`
 - Webhook requests are only processed when `ZALO_UPDATE_MODE=webhook`
 - In polling mode, webhook requests are acknowledged without processing
-- Supported webhook payloads are JSON object or JSON array and are runtime validated before normalization
+- Supported webhook payload is a single JSON object and is runtime validated before normalization
 - No custom signature mechanism is applied because the current official BOT docs do not document one in this implementation baseline
 - Shared inbound pipeline:
   - `Webhook payload -> ZaloUpdateValidator -> ZaloUpdateNormalizer -> ZaloInboundEventProcessor`
   - `getUpdates` polling reuses the same validator/normalizer/processor classes
+- Endpoint-specific Zalo BOT docs remained DNS-unreachable in this runtime during verification, so payload and result-shape assumptions are intentionally minimal and non-speculative.
 
 ## Error handling and redaction
 
