@@ -56,8 +56,8 @@
 ## Docker Compose usage
 
 - `docker-compose.yml` (development) provides safe local defaults.
-  - `bot-api` default mode: `ZALO_API_UPDATE_MODE=webhook`
-  - `bot-worker` default mode: `ZALO_WORKER_UPDATE_MODE=polling`
+  - `bot-api` and `bot-worker` share the same `ZALO_UPDATE_MODE` value
+  - default mode is `polling` to keep webhook intake inactive unless explicitly enabled
   - polling mode requires `bot-worker` replicas = `1` for a single bot token consumer
 - `docker-compose.prod.yml` requires explicit production-sensitive values, including `APP_ENCRYPTION_KEY`.
 - `docker-compose.prod.yml` requires explicit `ZALO_BOT_TOKEN`.
