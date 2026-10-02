@@ -26,6 +26,8 @@ function buildBotEnv(overrides = {}) {
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: '5',
     TRUST_PROXY: 'false',
     ZALO_POLL_TIMEOUT_SECONDS: '30',
+    ZALO_WEBHOOK_URL: 'https://bot.example.com/webhooks/zalo',
+    ZALO_WEBHOOK_SECRET_TOKEN: 'phase6-secret-token',
     ...overrides,
   };
 }
@@ -55,6 +57,8 @@ test('valid development bot config parses', () => {
   assert.equal(config.sessionCookieName, 'lhu_admin_session');
   assert.equal(config.trustProxy, false);
   assert.equal(config.zaloPollTimeoutSeconds, 30);
+  assert.equal(config.zaloWebhookUrl, 'https://bot.example.com/webhooks/zalo');
+  assert.equal(config.zaloWebhookSecretToken, 'phase6-secret-token');
 });
 
 test('development config can omit zalo token for deterministic tests', () => {
@@ -75,6 +79,46 @@ test('valid production bot config parses', () => {
   assert.equal(config.nodeEnv, 'production');
   assert.equal(config.zaloUpdateMode, 'webhook');
   assert.equal(config.sessionCookieSameSite, 'strict');
+});
+
+test('missing production webhook url fails when webhook mode is enabled', () => {
+  assertConfigError(
+    () =>
+      loadBotServiceConfig(
+        buildBotEnv({
+          NODE_ENV: 'production',
+          ZALO_UPDATE_MODE: 'webhook',
+          ZALO_WEBHOOK_URL: undefined,
+        }),
+      ),
+    'ZALO_WEBHOOK_URL: required in production when ZALO_UPDATE_MODE=webhook',
+  );
+});
+
+test('missing production webhook secret fails when webhook mode is enabled', () => {
+  assertConfigError(
+    () =>
+      loadBotServiceConfig(
+        buildBotEnv({
+          NODE_ENV: 'production',
+          ZALO_UPDATE_MODE: 'webhook',
+          ZALO_WEBHOOK_SECRET_TOKEN: undefined,
+        }),
+      ),
+    'ZALO_WEBHOOK_SECRET_TOKEN: required in production when ZALO_UPDATE_MODE=webhook',
+  );
+});
+
+test('invalid webhook secret length fails', () => {
+  assertConfigError(
+    () =>
+      loadBotServiceConfig(
+        buildBotEnv({
+          ZALO_WEBHOOK_SECRET_TOKEN: 'short',
+        }),
+      ),
+    'ZALO_WEBHOOK_SECRET_TOKEN: must be 8-256 characters',
+  );
 });
 
 test('missing production secret fails', () => {

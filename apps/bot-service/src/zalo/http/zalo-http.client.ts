@@ -5,7 +5,7 @@ import {
   ZALO_POLL_HTTP_TIMEOUT_MARGIN_MS,
 } from '../zalo.constants';
 import { ZaloApiRequestError, sanitizeZaloUrl } from '../zalo.errors';
-import type { GetUpdatesRequestOptions, ZaloHttpClient } from './zalo-http.types';
+import type { GetUpdatesRequestOptions, SetWebhookRequest, ZaloHttpClient } from './zalo-http.types';
 
 interface ZaloApiEnvelope {
   readonly ok: boolean;
@@ -30,6 +30,41 @@ export class OfficialZaloHttpClient implements ZaloHttpClient {
       body: { timeout: timeoutSeconds },
       timeoutMs: (timeoutSeconds * 1_000) + ZALO_POLL_HTTP_TIMEOUT_MARGIN_MS,
       signal: options.signal,
+    });
+  }
+
+  public async setWebhook(token: string, request: SetWebhookRequest): Promise<unknown> {
+    return this.callApi(token, 'setWebhook', {
+      method: 'POST',
+      body: {
+        url: request.url,
+        secret_token: request.secret_token,
+      },
+      timeoutMs: ZALO_CONNECTION_TIMEOUT_MS,
+    });
+  }
+
+  public async testWebhook(token: string): Promise<unknown> {
+    return this.callApi(token, 'testWebhook', {
+      method: 'POST',
+      body: {},
+      timeoutMs: ZALO_CONNECTION_TIMEOUT_MS,
+    });
+  }
+
+  public async deleteWebhook(token: string): Promise<unknown> {
+    return this.callApi(token, 'deleteWebhook', {
+      method: 'POST',
+      body: {},
+      timeoutMs: ZALO_CONNECTION_TIMEOUT_MS,
+    });
+  }
+
+  public async getWebhookInfo(token: string): Promise<unknown> {
+    return this.callApi(token, 'getWebhookInfo', {
+      method: 'POST',
+      body: {},
+      timeoutMs: ZALO_CONNECTION_TIMEOUT_MS,
     });
   }
 

@@ -3,7 +3,7 @@ import type { BotServiceConfig } from '@lhu/config';
 import { ZALO_CONFIG, ZALO_CONNECTION_TIMEOUT_MS, ZALO_HTTP_CLIENT } from './zalo.constants';
 import { ZaloIntegrationError, createSafeLogPayload, mapHttpError, sanitizeZaloUrl } from './zalo.errors';
 import type { ZaloHttpClient } from './http/zalo-http.types';
-import type { ZaloBotIdentity } from './zalo.types';
+import type { ZaloBotIdentity, ZaloWebhookInfo } from './zalo.types';
 
 @Injectable()
 export class ZaloAdapter {
@@ -25,13 +25,7 @@ export class ZaloAdapter {
   }
 
   public async getIdentity(): Promise<ZaloBotIdentity> {
-    if (!this.hasConfiguredToken()) {
-      throw new ZaloIntegrationError('Zalo token is not configured', {
-        status: 'AUTHENTICATION_FAILED',
-        retryable: false,
-      });
-    }
-
+    this.ensureToken();
     const response = await this.withTimeout(this.zaloHttpClient.getMe(this.token));
     return this.normalizeIdentity(response);
   }
@@ -40,14 +34,34 @@ export class ZaloAdapter {
     readonly timeoutSeconds: number;
     readonly signal?: AbortSignal;
   }): Promise<unknown> {
-    if (!this.hasConfiguredToken()) {
-      throw new ZaloIntegrationError('Zalo token is not configured', {
-        status: 'AUTHENTICATION_FAILED',
-        retryable: false,
-      });
-    }
-
+    this.ensureToken();
     return this.zaloHttpClient.getUpdates(this.token, options);
+  }
+
+  public async setWebhook(input: { readonly url: string; readonly secretToken: string }): Promise<ZaloWebhookInfo> {
+    this.ensureToken();
+    const response = await this.zaloHttpClient.setWebhook(this.token, {
+      url: input.url,
+      secret_token: input.secretToken,
+    });
+    return this.normalizeWebhookInfo(response, 'setWebhook');
+  }
+
+  public async testWebhook(): Promise<void> {
+    this.ensureToken();
+    await this.zaloHttpClient.testWebhook(this.token);
+  }
+
+  public async deleteWebhook(): Promise<ZaloWebhookInfo> {
+    this.ensureToken();
+    const response = await this.zaloHttpClient.deleteWebhook(this.token);
+    return this.normalizeWebhookInfo(response, 'deleteWebhook');
+  }
+
+  public async getWebhookInfo(): Promise<ZaloWebhookInfo> {
+    this.ensureToken();
+    const response = await this.zaloHttpClient.getWebhookInfo(this.token);
+    return this.normalizeWebhookInfo(response, 'getWebhookInfo');
   }
 
   public createSafeErrorPayload(error: unknown): Readonly<Record<string, unknown>> {
@@ -56,6 +70,15 @@ export class ZaloAdapter {
 
   public mapError(error: unknown): ZaloIntegrationError {
     return mapHttpError(error);
+  }
+
+  private ensureToken(): void {
+    if (!this.hasConfiguredToken()) {
+      throw new ZaloIntegrationError('Zalo token is not configured', {
+        status: 'AUTHENTICATION_FAILED',
+        retryable: false,
+      });
+    }
   }
 
   private async withTimeout<T>(promise: Promise<T>): Promise<T> {
@@ -83,7 +106,7 @@ export class ZaloAdapter {
   }
 
   private normalizeIdentity(response: unknown): ZaloBotIdentity {
-    const envelope = this.toRecord(response);
+    const envelope = this.toRecord(response, 'Zalo getMe returned invalid payload type');
     if (envelope.ok !== true) {
       throw new ZaloIntegrationError('Zalo getMe returned unsuccessful response envelope', {
         status: 'INVALID_RESPONSE',
@@ -124,9 +147,45 @@ export class ZaloAdapter {
     };
   }
 
-  private toRecord(input: unknown): Record<string, unknown> {
+  private normalizeWebhookInfo(
+    response: unknown,
+    operation: 'setWebhook' | 'deleteWebhook' | 'getWebhookInfo',
+  ): ZaloWebhookInfo {
+    const envelope = this.toRecord(response, `Zalo ${operation} returned invalid payload type`);
+    if (envelope.ok !== true) {
+      throw new ZaloIntegrationError(`Zalo ${operation} returned unsuccessful response envelope`, {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
+    }
+
+    const result = this.toRecord(envelope.result, `Zalo ${operation} returned invalid result payload`);
+    const url = typeof result.url === 'string' ? result.url.trim() : '';
+    if (typeof result.url !== 'string') {
+      throw new ZaloIntegrationError(`Zalo ${operation} returned invalid webhook URL`, {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
+    }
+
+    const updatedAt = result.updated_at;
+    if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) {
+      throw new ZaloIntegrationError(`Zalo ${operation} returned invalid webhook updated_at`, {
+        status: 'INVALID_RESPONSE',
+        retryable: false,
+      });
+    }
+
+    return {
+      url,
+      updatedAt,
+      isConfigured: url.length > 0,
+    };
+  }
+
+  private toRecord(input: unknown, message: string): Record<string, unknown> {
     if (!input || typeof input !== 'object') {
-      throw new ZaloIntegrationError('Zalo getMe returned invalid payload type', {
+      throw new ZaloIntegrationError(message, {
         status: 'INVALID_RESPONSE',
         retryable: false,
       });

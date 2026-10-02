@@ -27,17 +27,60 @@ test('validator accepts single event object result', () => {
   assert.equal(events[0]?.event_name, 'message.text.received');
 });
 
-test('validator accepts array result and drops non-object entries', () => {
-  const events = validator.extractRawEvents({
-    ok: true,
-    result: [{ event_name: 'message.text.received' }, null, 123, { event_name: 'message.image.received' }],
+test('validator rejects array polling result payload', () => {
+  assert.throws(() => validator.extractRawEvents({ ok: true, result: [{ event_name: 'message.text.received' }] }), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
   });
-
-  assert.equal(events.length, 2);
 });
 
 test('validator rejects malformed envelope', () => {
   assert.throws(() => validator.extractRawEvents('invalid-payload'), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('webhook validator accepts object payload', () => {
+  const events = validator.extractRawWebhookEvents({
+    ok: true,
+    result: {
+      event_name: 'message.text.received',
+      message: { msg_id: 'm-1' },
+    },
+  });
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.event_name, 'message.text.received');
+});
+
+test('webhook validator rejects invalid payload type', () => {
+  assert.throws(() => validator.extractRawWebhookEvents('invalid-payload'), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('webhook validator rejects array payload', () => {
+  assert.throws(() => validator.extractRawWebhookEvents([{ event_name: 'message.text.received' }]), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('webhook validator rejects payload without ok=true envelope', () => {
+  assert.throws(() => validator.extractRawWebhookEvents({ ok: false, result: {} }), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
+});
+
+test('webhook validator rejects payload without result.event_name', () => {
+  assert.throws(() => validator.extractRawWebhookEvents({ ok: true, result: {} }), (error: unknown) => {
     assert.ok(error instanceof ZaloIntegrationError);
     assert.equal(error.status, 'INVALID_RESPONSE');
     return true;
@@ -100,6 +143,26 @@ test('normalizer keeps unknown event safe and non-crashing', () => {
     senderId: undefined,
     recipientId: undefined,
     timestamp: undefined,
+  });
+
+  test('normalizer keeps message.unsupported.received as supported event even without message body', () => {
+    const normalized = normalizer.normalize(
+      {
+        event_name: 'message.unsupported.received',
+      },
+      'webhook',
+    );
+
+    assert.deepEqual(normalized, {
+      source: 'webhook',
+      eventName: 'message.unsupported.received',
+      supported: true,
+      messageId: undefined,
+      chatType: undefined,
+      senderId: undefined,
+      recipientId: undefined,
+      timestamp: undefined,
+    });
   });
 
   const serialized = JSON.stringify(normalized);

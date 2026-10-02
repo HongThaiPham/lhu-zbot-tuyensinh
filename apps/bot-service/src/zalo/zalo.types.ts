@@ -50,3 +50,33 @@ export interface ZaloInboundEvent {
   readonly recipientId?: string;
   readonly timestamp?: number;
 }
+
+export interface ZaloWebhookInfo {
+  readonly url: string;
+  readonly updatedAt: number;
+  readonly isConfigured: boolean;
+}
+
+export interface ZaloWebhookOperationResult {
+  readonly ok: true;
+  readonly status: 'SUCCESS';
+  readonly webhook?: ZaloWebhookInfo;
+}
+
+export interface ZaloWebhookOperationFailureResult extends ZaloConnectionFailureResult {
+  readonly ok: false;
+}
+
+export type ZaloWebhookMutationResult = ZaloWebhookOperationResult | ZaloWebhookOperationFailureResult;
+
+export interface ZaloWebhookInfoSuccessResult extends ZaloWebhookOperationResult {
+  readonly webhook: ZaloWebhookInfo;
+}
+
+export type ZaloWebhookInfoResult = ZaloWebhookInfoSuccessResult | ZaloWebhookOperationFailureResult;
+
+export interface ZaloWebhookInboundResult {
+  readonly accepted: boolean;
+  readonly mode: 'webhook' | 'polling';
+  readonly processed: number;
+}

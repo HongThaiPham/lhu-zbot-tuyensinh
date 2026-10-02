@@ -8,8 +8,10 @@ import { ZaloUpdateValidator } from './zalo-update.validator';
 import { ZaloUpdateNormalizer } from './zalo-update.normalizer';
 import { ZaloInboundEventProcessor } from './zalo-inbound-event.processor';
 import { ZaloPollingWorker } from './zalo-polling.worker';
+import { ZaloWebhookController } from './zalo-webhook.controller';
 
 @Module({
+  controllers: [ZaloWebhookController],
   providers: [
     {
       provide: ZALO_CONFIG,

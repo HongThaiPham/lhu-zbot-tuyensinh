@@ -26,6 +26,8 @@
 - `BOT_SERVICE_ROLE` (`api | worker`) — required
 - `ZALO_UPDATE_MODE` (`polling | webhook`) — required
 - `ZALO_POLL_TIMEOUT_SECONDS` (integer, `1-300`, default `30`) — long-poll timeout passed to Zalo `getUpdates`
+- `ZALO_WEBHOOK_URL` (`http://` or `https://`) — required in production when `ZALO_UPDATE_MODE=webhook`
+- `ZALO_WEBHOOK_SECRET_TOKEN` (string, `8-256` chars) — required in production when `ZALO_UPDATE_MODE=webhook`; used for `setWebhook.secret_token` and webhook header verification
 - `ZALO_BOT_TOKEN` — required in production, optional in development/test for deterministic mock-based tests
 - `PORT` (TCP port 1-65535) — optional, defaults to `3001`
 - `APP_ENCRYPTION_KEY` — required in production
@@ -50,15 +52,18 @@
 
 `APP_ENCRYPTION_KEY` must never be logged or rendered in error output. Production startup fails if it is missing, empty, placeholder/default, too short, or malformed.
 `ZALO_BOT_TOKEN` must never be logged or rendered in error output. Production startup fails if it is missing/empty or a placeholder/default value.
+`ZALO_WEBHOOK_URL` is used for webhook management operations and must be a valid `http://` or `https://` URL. Production webhook configuration requires HTTPS.
+`ZALO_WEBHOOK_SECRET_TOKEN` must remain server-only and must never be logged, returned in APIs, or stored in audit metadata.
 
 ## Docker Compose usage
 
 - `docker-compose.yml` (development) provides safe local defaults.
-  - `bot-api` default mode: `ZALO_API_UPDATE_MODE=webhook`
-  - `bot-worker` default mode: `ZALO_WORKER_UPDATE_MODE=polling`
+  - `bot-api` and `bot-worker` share the same `ZALO_UPDATE_MODE` value
+  - default mode is `polling` to keep webhook intake inactive unless explicitly enabled
   - polling mode requires `bot-worker` replicas = `1` for a single bot token consumer
 - `docker-compose.prod.yml` requires explicit production-sensitive values, including `APP_ENCRYPTION_KEY`.
 - `docker-compose.prod.yml` requires explicit `ZALO_BOT_TOKEN`.
+- `docker-compose.prod.yml` requires explicit `ZALO_WEBHOOK_URL` for webhook mode.
 - PostgreSQL and Redis remain internal-only in production topology (no public host port mapping).
 
 ## Startup validation and fail-fast behavior
@@ -67,6 +72,8 @@ On invalid configuration, startup fails immediately with a safe error format:
 
 - `APP_ENCRYPTION_KEY: required in production`
 - `ZALO_BOT_TOKEN: required in production`
+- `ZALO_WEBHOOK_URL: required in production when ZALO_UPDATE_MODE=webhook`
+- `ZALO_WEBHOOK_SECRET_TOKEN: required in production when ZALO_UPDATE_MODE=webhook`
 - `ZALO_POLL_TIMEOUT_SECONDS: invalid value`
 - `BOT_SERVICE_ROLE: invalid value`
 

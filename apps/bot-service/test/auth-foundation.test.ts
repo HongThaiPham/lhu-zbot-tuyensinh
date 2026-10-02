@@ -60,6 +60,8 @@ function buildAuthService(
       loginRateLimitMaxAttempts: 5,
       trustProxy: false,
       zaloPollTimeoutSeconds: 30,
+      zaloWebhookUrl: 'https://bot.example.com/webhooks/zalo',
+      zaloWebhookSecretToken: 'phase6-test-secret',
       ...configOverrides,
     },
     prisma as never,

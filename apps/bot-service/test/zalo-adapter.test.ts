@@ -23,6 +23,8 @@ function buildConfig(overrides: Partial<BotServiceConfig> = {}): BotServiceConfi
     loginRateLimitMaxAttempts: 5,
     trustProxy: false,
     zaloPollTimeoutSeconds: 30,
+    zaloWebhookUrl: 'https://bot.example.com/webhooks/zalo',
+    zaloWebhookSecretToken: 'phase6-test-secret',
     ...overrides,
   };
 }
@@ -31,6 +33,10 @@ function buildClient(getMeImpl: (token?: string) => Promise<unknown>): ZaloHttpC
   return {
     getMe: getMeImpl,
     getUpdates: async () => ({ ok: true, result: [] }),
+    setWebhook: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+    testWebhook: async () => ({ ok: true, result: true }),
+    deleteWebhook: async () => ({ ok: true, result: { url: '', updated_at: 1_749_638_250_568 } }),
+    getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
   };
 }
 
@@ -274,6 +280,10 @@ test('getUpdates forwards timeout and abort signal to http client', async () => 
       receivedSignal = options.signal;
       return { ok: true, result: null };
     },
+    setWebhook: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+    testWebhook: async () => ({ ok: true, result: true }),
+    deleteWebhook: async () => ({ ok: true, result: { url: '', updated_at: 1_749_638_250_568 } }),
+    getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
   };
 
   const adapter = new ZaloAdapter(buildConfig({ zaloBotToken: 'token-from-config' }), client);
@@ -286,4 +296,110 @@ test('getUpdates forwards timeout and abort signal to http client', async () => 
   assert.equal(receivedToken, 'token-from-config');
   assert.equal(receivedTimeoutSeconds, 30);
   assert.equal(receivedSignal, controller.signal);
+});
+
+test('setWebhook forwards configured token and url to http client', async () => {
+  let receivedToken = '';
+  let receivedUrl = '';
+  let receivedSecretToken = '';
+  const client: ZaloHttpClient = {
+    getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+    getUpdates: async () => ({ ok: true, result: [] }),
+    setWebhook: async (token, request) => {
+      receivedToken = token;
+      receivedUrl = request.url;
+      receivedSecretToken = request.secret_token;
+      return { ok: true, result: { url: request.url, updated_at: 1_749_638_250_568 } };
+    },
+    testWebhook: async () => ({ ok: true, result: true }),
+    deleteWebhook: async () => ({ ok: true, result: { url: '', updated_at: 1_749_638_250_568 } }),
+    getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+  };
+
+  const adapter = new ZaloAdapter(buildConfig({ zaloBotToken: 'token-from-config' }), client);
+  const webhook = await adapter.setWebhook({
+    url: 'https://bot.example.com/webhooks/zalo',
+    secretToken: 'phase6-test-secret',
+  });
+
+  assert.equal(receivedToken, 'token-from-config');
+  assert.equal(receivedUrl, 'https://bot.example.com/webhooks/zalo');
+  assert.equal(receivedSecretToken, 'phase6-test-secret');
+  assert.equal(webhook.updatedAt, 1_749_638_250_568);
+});
+
+test('getWebhookInfo maps url result safely', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    {
+      getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+      getUpdates: async () => ({ ok: true, result: [] }),
+      setWebhook: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+      testWebhook: async () => ({ ok: true, result: true }),
+      deleteWebhook: async () => ({ ok: true, result: { url: '', updated_at: 1_749_638_250_568 } }),
+      getWebhookInfo: async () => ({
+        ok: true,
+        result: {
+          url: 'https://bot.example.com/webhooks/zalo',
+          updated_at: 1_749_633_372_026,
+          token: 'secret',
+        },
+      }),
+    },
+  );
+
+  const result = await adapter.getWebhookInfo();
+  assert.deepEqual(result, {
+    isConfigured: true,
+    url: 'https://bot.example.com/webhooks/zalo',
+    updatedAt: 1_749_633_372_026,
+  });
+  assert.equal(JSON.stringify(result).includes('secret'), false);
+});
+
+test('setWebhook rejects result missing updated_at', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    {
+      getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+      getUpdates: async () => ({ ok: true, result: [] }),
+      setWebhook: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo' } }),
+      testWebhook: async () => ({ ok: true, result: true }),
+      deleteWebhook: async () => ({ ok: true, result: { url: '', updated_at: 1_749_638_250_568 } }),
+      getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+    },
+  );
+
+  await assert.rejects(
+    async () =>
+      adapter.setWebhook({
+        url: 'https://bot.example.com/webhooks/zalo',
+        secretToken: 'phase6-test-secret',
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof ZaloIntegrationError);
+      assert.equal(error.status, 'INVALID_RESPONSE');
+      return true;
+    },
+  );
+});
+
+test('deleteWebhook rejects result missing url', async () => {
+  const adapter = new ZaloAdapter(
+    buildConfig(),
+    {
+      getMe: async () => ({ ok: true, result: buildOfficialResultFixture() }),
+      getUpdates: async () => ({ ok: true, result: [] }),
+      setWebhook: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+      testWebhook: async () => ({ ok: true, result: true }),
+      deleteWebhook: async () => ({ ok: true, result: { updated_at: 1_749_638_250_568 } }),
+      getWebhookInfo: async () => ({ ok: true, result: { url: 'https://bot.example.com/webhooks/zalo', updated_at: 1_749_638_250_568 } }),
+    },
+  );
+
+  await assert.rejects(async () => adapter.deleteWebhook(), (error: unknown) => {
+    assert.ok(error instanceof ZaloIntegrationError);
+    assert.equal(error.status, 'INVALID_RESPONSE');
+    return true;
+  });
 });

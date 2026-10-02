@@ -211,3 +211,122 @@ test('getUpdates local timeout cancellation maps to timeout without token leak',
     globalThis.setTimeout = originalSetTimeout;
   }
 });
+
+test('setWebhook calls official endpoint with url and secret_token payload', async () => {
+  const client = new OfficialZaloHttpClient();
+  let calledUrl = '';
+  let calledMethod = '';
+  let calledBody = '';
+
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    calledUrl = typeof input === 'string' ? input : input.toString();
+    calledMethod = init?.method ?? '';
+    calledBody = typeof init?.body === 'string' ? init.body : '';
+    return new Response(JSON.stringify({ ok: true, result: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  const response = await client.setWebhook('phase6-token', {
+    url: 'https://bot.example.com/webhooks/zalo',
+    secret_token: 'phase6-webhook-secret',
+  });
+  assert.deepEqual(response, { ok: true, result: true });
+  assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase6-token/setWebhook');
+  assert.equal(calledMethod, 'POST');
+  assert.equal(calledBody, JSON.stringify({
+    url: 'https://bot.example.com/webhooks/zalo',
+    secret_token: 'phase6-webhook-secret',
+  }));
+});
+
+test('testWebhook calls official endpoint with empty json body', async () => {
+  const client = new OfficialZaloHttpClient();
+  let calledUrl = '';
+  let calledBody = '';
+
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    calledUrl = typeof input === 'string' ? input : input.toString();
+    calledBody = typeof init?.body === 'string' ? init.body : '';
+    return new Response(JSON.stringify({ ok: true, result: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  await client.testWebhook('phase6-token');
+  assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase6-token/testWebhook');
+  assert.equal(calledBody, '{}');
+});
+
+test('deleteWebhook calls official endpoint with empty json body', async () => {
+  const client = new OfficialZaloHttpClient();
+  let calledUrl = '';
+  let calledBody = '';
+
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    calledUrl = typeof input === 'string' ? input : input.toString();
+    calledBody = typeof init?.body === 'string' ? init.body : '';
+    return new Response(JSON.stringify({ ok: true, result: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  await client.deleteWebhook('phase6-token');
+  assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase6-token/deleteWebhook');
+  assert.equal(calledBody, '{}');
+});
+
+test('getWebhookInfo calls official endpoint with empty json body', async () => {
+  const client = new OfficialZaloHttpClient();
+  let calledUrl = '';
+  let calledBody = '';
+
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    calledUrl = typeof input === 'string' ? input : input.toString();
+    calledBody = typeof init?.body === 'string' ? init.body : '';
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  const response = await client.getWebhookInfo('phase6-token');
+  assert.deepEqual(response, { ok: true });
+  assert.equal(calledUrl, 'https://bot-api.zaloplatforms.com/botphase6-token/getWebhookInfo');
+  assert.equal(calledBody, '{}');
+});
+
+test('webhook methods sanitize token in errors', async () => {
+  const client = new OfficialZaloHttpClient();
+
+  globalThis.fetch = (async (): Promise<Response> =>
+    new Response('not json', { status: 502 })) as typeof fetch;
+
+  await assert.rejects(
+    async () =>
+      client.setWebhook('phase6-secret-token', {
+        url: 'https://bot.example.com/webhooks/zalo',
+        secret_token: 'phase6-webhook-secret',
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof ZaloApiRequestError);
+      assert.equal(error.requestUrl, 'https://bot-api.zaloplatforms.com/bot[REDACTED]/setWebhook');
+      return true;
+    },
+  );
+});
